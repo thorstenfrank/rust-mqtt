@@ -1,6 +1,6 @@
 use std::fmt::{self, Display};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum MqttError {
     Message(String),
 }

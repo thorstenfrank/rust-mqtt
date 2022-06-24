@@ -5,7 +5,6 @@ pub use self::connect::ConnectPacket;
 pub use self::connack::ConnackPacket;
 
 /// MQTT control packet types.
-#[repr(u8)]
 pub enum PacketType {
     CONNECT = 1,
     CONNACK = 2,
