@@ -1,5 +1,7 @@
 use std::fmt::{self, Display};
 
+use crate::packet::PacketType;
+
 /// 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MqttError {
@@ -9,6 +11,12 @@ pub enum MqttError {
 
     /// a general-use error string
     Message(String),
+}
+
+impl MqttError {
+    pub fn invalid_packet_identifier(packet_type: PacketType, first_byte: &u8) -> Self {
+        MqttError::MalformedPacket(format!("Invalid packet identifier for {}: {:08b}", packet_type, first_byte))
+    }
 }
 
 impl std::error::Error for MqttError {}

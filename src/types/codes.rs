@@ -28,6 +28,20 @@ pub enum ReasonCode {
     ConnectionRateExceeded = 0x9F,
 }
 
+impl ReasonCode {
+
+    pub fn is_err(&self) -> bool {
+        let num = *self as u8;
+        num <= 128
+    }
+}
+
+impl Into<u8> for ReasonCode {
+    fn into(self) -> u8 {
+        self as u8
+    }
+}
+
 impl TryFrom<u8> for ReasonCode {
     type Error = MqttError;
 

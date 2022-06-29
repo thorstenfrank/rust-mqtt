@@ -1,7 +1,11 @@
 mod connect;
 mod connack;
+mod disconnect;
+
+use std::fmt::Display;
 
 use crate::error::MqttError;
+use crate::types::YesNoMaybe;
 
 pub use self::connect::ConnectPacket;
 pub use self::connack::ConnackPacket;
@@ -53,11 +57,36 @@ impl TryFrom<u8> for PacketType {
     }
 }
 
+impl Display for PacketType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            PacketType::CONNECT => write!(f, "CONNECT"),
+            PacketType::CONNACK => write!(f, "CONNACK"),
+            PacketType::PUBLISH => write!(f, "PUBLISH"),
+            PacketType::PUBACK => write!(f, "PUBACK"),
+            PacketType::PUBREC => write!(f, "PUBREC"),
+            PacketType::PUBREL => write!(f, "PUBREL"),
+            PacketType::PUBCOMP => write!(f, "PUBCOMP"),
+            PacketType::SUBSCRIBE => write!(f, "SUBSCRIBE"),
+            PacketType::SUBACK => write!(f, "SUBACK"),
+            PacketType::UNSUBSCRIBE => write!(f, "UNSUBSCRIBE"),
+            PacketType::UNSUBACK => write!(f, "UNSUBACK"),
+            PacketType::PINGREQ => write!(f, "PINGREQ"),
+            PacketType::PINGRESP => write!(f, "PINGRESP"),
+            PacketType::DISCONNECT => write!(f, "DISCONNECT"),
+            PacketType::AUTH => write!(f, "AUTH"),
+            _=> write!(f, "UNKONWN"),
+        }
+    }
+}
+
 /// Common behavior for MQTT control packets.
 pub trait MqttControlPacket {
 
     /// packet type
     fn packet_type() -> PacketType;
+
+    fn payload_requirement() -> YesNoMaybe;
 }
 
 #[cfg(test)]
@@ -74,11 +103,11 @@ mod tests {
 
     #[test]
     fn test_packet_from_u8() {
-        let mut res = PacketType::try_from(0b00000000);
-        assert!(res.is_err());
-        assert_eq!(Some(MqttError::Message("undefined packet type: 0".to_string())), res.err());
+        assert_eq!(Some(MqttError::Message("undefined packet type: 0".to_string())), PacketType::try_from(0b00000000).err());
 
         do_test_packet_from_u8(0b00010000, PacketType::CONNECT);
+        // just doing this to test that the last four bits are ignored
+        do_test_packet_from_u8(0b00011111, PacketType::CONNECT);
         do_test_packet_from_u8(0b00100000, PacketType::CONNACK);
         do_test_packet_from_u8(0b00110000, PacketType::PUBLISH);
         do_test_packet_from_u8(0b01000000, PacketType::PUBACK);
@@ -93,6 +122,7 @@ mod tests {
         do_test_packet_from_u8(0b11010000, PacketType::PINGRESP);
         do_test_packet_from_u8(0b11100000, PacketType::DISCONNECT);
         do_test_packet_from_u8(0b11110000, PacketType::AUTH);
+        do_test_packet_from_u8(0b11110101, PacketType::AUTH);
     }
 
     fn do_test_packet_from_u8(numeric: u8, expected: PacketType) {

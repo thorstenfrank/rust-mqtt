@@ -68,21 +68,38 @@ impl From<&[u8]> for ConnackPacket {
     }
 }
 
+impl Into<Vec<u8>> for ConnackPacket {
+    fn into(self) -> Vec<u8> {
+        let mut packet: Vec<u8> = Vec::new();
+        packet.push(32);
+        packet.push(3); // FIXME calculate the remaining length
+        packet.push(self.session_present.into());
+        packet.push(self.reason_code.into());
+        packet.push(0); // FIXME properties go here...
+        packet
+    }
+}
+
 impl MqttControlPacket for ConnackPacket {
     
     fn packet_type() -> PacketType {
         PacketType::CONNACK
     }
     
+    fn payload_requirement() -> crate::types::YesNoMaybe {
+        crate::types::YesNoMaybe::None
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
+    use std::vec;
+
     use super::*;
 
     #[test]
-    fn test_decode() {
+    fn decode() {
         // normal, clean session and reason code 0
         run_decode(
             &vec![32, 12, 0, 0, 9, 19, 255, 255, 34, 0, 10, 33, 0, 20], 
@@ -105,6 +122,14 @@ mod tests {
             &vec![32, 3, 1, 0x8C, 0], // bad authentication
             true, 
             ReasonCode::BadAuthenticationMethod);
+    }
+
+    #[test]
+    fn encode() {
+        let connack = ConnackPacket { session_present: false, reason_code: ReasonCode::Success };
+        let bin: Vec<u8> = connack.into();
+        let expected = vec![32, 3, 0, 0, 0];
+        assert_eq!(expected, bin);
     }
 
     fn run_decode(binary: &[u8], session_present: bool, reason_code: ReasonCode) {

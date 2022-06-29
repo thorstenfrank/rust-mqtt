@@ -111,6 +111,10 @@ impl MqttControlPacket for ConnectPacket {
     fn packet_type() -> PacketType {
         PacketType::CONNECT
     }
+
+    fn payload_requirement() -> crate::types::YesNoMaybe {
+        crate::types::YesNoMaybe::Required
+    }
 }
 
 #[cfg(test)]
@@ -119,7 +123,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_encode() {
+    fn encode() {
         let conn = ConnectPacket::new(UTF8String::from_str("WUPPDI"));
 
         let binary: Vec<u8> = conn.into();
@@ -144,7 +148,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decode() {
+    fn decode() {
         let binary: Vec<u8> = vec![16,19,0,4,77,81,84,84,5,2,0,0,0,0,6,87,85,80,80,68,73];
         let decoded = ConnectPacket::from(&binary[..]);
         let expect = ConnectPacket::new(UTF8String::from_str("WUPPDI"));
