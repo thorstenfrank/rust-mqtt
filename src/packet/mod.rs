@@ -75,7 +75,6 @@ impl Display for PacketType {
             PacketType::PINGRESP => write!(f, "PINGRESP"),
             PacketType::DISCONNECT => write!(f, "DISCONNECT"),
             PacketType::AUTH => write!(f, "AUTH"),
-            _=> write!(f, "UNKONWN"),
         }
     }
 }
