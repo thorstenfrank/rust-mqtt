@@ -39,6 +39,16 @@ pub struct ConnackPacket {
 
 }
 
+impl ConnackPacket {
+    fn remaining_length(&self) -> VariableByteInteger {
+        let value = 3;
+
+        // TODO add option length calc here
+
+        VariableByteInteger { value }
+    }
+}
+
 impl From<&[u8]> for ConnackPacket {
     fn from(src: &[u8]) -> Self {
         // FIXME this really should be try_into so we can use results and error handling
@@ -71,8 +81,10 @@ impl From<&[u8]> for ConnackPacket {
 impl Into<Vec<u8>> for ConnackPacket {
     fn into(self) -> Vec<u8> {
         let mut packet: Vec<u8> = Vec::new();
+        let mut length: Vec<u8> = self.remaining_length().into();
+
         packet.push(32);
-        packet.push(3); // FIXME calculate the remaining length
+        packet.append(&mut length);
         packet.push(self.session_present.into());
         packet.push(self.reason_code.into());
         packet.push(0); // FIXME properties go here...
@@ -130,6 +142,12 @@ mod tests {
         let bin: Vec<u8> = connack.into();
         let expected = vec![32, 3, 0, 0, 0];
         assert_eq!(expected, bin);
+    }
+    
+    #[test]
+    fn remaining_length() {
+        let packet = ConnackPacket { session_present: true, reason_code: ReasonCode::Success };
+        assert_eq!(VariableByteInteger { value: 3}, packet.remaining_length());
     }
 
     fn run_decode(binary: &[u8], session_present: bool, reason_code: ReasonCode) {

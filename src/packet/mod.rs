@@ -82,12 +82,12 @@ impl Display for PacketType {
 /// Common behavior for MQTT control packets.
 pub trait MqttControlPacket {
 
-    /// packet type
+    /// Not sure we really need this...
     fn packet_type() -> PacketType;
 
-    fn payload_requirement() -> YesNoMaybe;
+    /// Whether this packet's payload is mandatory, optional or probibited.
+    fn payload_requirement() -> YesNoMaybe;   
 }
-
 #[cfg(test)]
 mod tests {
     use crate::error::MqttError;

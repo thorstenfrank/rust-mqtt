@@ -1,4 +1,4 @@
-use crate::{types::ReasonCode, error::MqttError};
+use crate::{types::ReasonCode, error::MqttError, VariableByteInteger};
 
 use super::{MqttControlPacket, PacketType};
 
@@ -22,6 +22,14 @@ pub struct DisconnectPacket {
     // properties...
 }
 
+impl DisconnectPacket {
+    fn remaining_length(&self) -> VariableByteInteger {
+        let value: u32 = 2; // 1 Byte for the reason code, 1 Byte for the properties length
+
+        VariableByteInteger { value }
+    }
+}
+
 impl TryFrom<&[u8]> for DisconnectPacket {
     type Error = MqttError;
 
@@ -37,9 +45,12 @@ impl TryFrom<&[u8]> for DisconnectPacket {
 impl Into<Vec<u8>> for DisconnectPacket {
     fn into(self) -> Vec<u8> {
         let mut packet: Vec<u8> = Vec::new();
+        let mut length: Vec<u8> = self.remaining_length().into();
+
         packet.push(FIRST_BYTE);
-        packet.push(1);
+        packet.append(&mut length);
         packet.push(self.reason_code.into());
+        packet.push(0); // properties length
         packet
     }
 }
@@ -65,7 +76,7 @@ mod tests {
     fn encode() {
         let disconnect = DisconnectPacket { reason_code: ReasonCode::Success };
         let binary: Vec<u8> = disconnect.into();
-        let expected: Vec<u8> = vec![224, 1, 0];
+        let expected: Vec<u8> = vec![224, 2, 0, 0];
         assert_eq!(expected, binary);
     }
 
@@ -77,10 +88,20 @@ mod tests {
     }
 
     #[test]
-    fn decode_unspecified_error() {
-        let binary: Vec<u8> = vec![224, 1, 0x80];
+    fn decode_reason_code_unspecified_error() {
+        let binary: Vec<u8> = vec![224, 2, 128, 0];
         let disconnect = DisconnectPacket::try_from(&binary[..]).unwrap();
         assert_eq!(ReasonCode::UnspecifiedError, disconnect.reason_code);
+    }
+
+    #[test]
+    fn decode_reason_code_with_will() {
+        let binary: Vec<u8> = vec![224, 2, 4, 0];
+
+        // FIXME: Reason Code 4 (disconnect with will message) is not yet implemented, which is why we're
+        // expecting an undefined error for now
+        let disconnect = DisconnectPacket::try_from(&binary[..]);
+        assert!(disconnect.is_err());
     }
 
     #[test]
@@ -90,5 +111,11 @@ mod tests {
         assert!(res.is_err(), "expected a MalformedPacket error");
         assert_eq!(Some(MqttError::MalformedPacket(format!("Invalid packet identifier for DISCONNECT: 00100000"))), res.err());
         
+    }
+
+    #[test]
+    fn remaining_length() {
+        let disconnect = DisconnectPacket {reason_code: ReasonCode::Success};
+        assert_eq!(VariableByteInteger { value: 2 }, disconnect.remaining_length());
     }
 }
