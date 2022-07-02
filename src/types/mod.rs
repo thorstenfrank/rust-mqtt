@@ -1,3 +1,4 @@
+mod bytes;
 mod codes;
 mod integer;
 mod string;
@@ -13,3 +14,6 @@ pub enum YesNoMaybe {
     Required,
     Optional,
 }
+
+/// Right now just a marker trait.
+pub trait MqttDataType {}

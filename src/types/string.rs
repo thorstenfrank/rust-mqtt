@@ -1,8 +1,12 @@
+use super::MqttDataType;
+
 /// MQTT-1.5.4
 #[derive(Debug, PartialEq)]
 pub struct UTF8String {
     value: String,
 }
+
+impl MqttDataType for UTF8String {}
 
 impl UTF8String {
 
@@ -41,6 +45,7 @@ impl Into<Vec<u8>> for UTF8String {
     }
 }
 
+// FIXME change this to TryFrom
 impl From<&[u8]> for UTF8String {
     fn from(src: &[u8]) -> Self {
         // FIXME yeah, yeah, yeah, I know, we need to actually read the length of the string
@@ -60,7 +65,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_encode_utf8() {
+    fn encode_utf8() {
         let utf8 = UTF8String::from_str("MQTT");
         let expect: Vec<u8> = vec![0, 4, 77, 81, 84, 84];
         let actual: Vec<u8> = utf8.into();
@@ -68,7 +73,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decode_utf8() {
+    fn decode_utf8() {
         let source: Vec<u8> = vec![0, 4, 77, 81, 84, 84];
         let expect = UTF8String::new(String::from_str("MQTT").unwrap());
         let actual = UTF8String::from(source.as_slice());

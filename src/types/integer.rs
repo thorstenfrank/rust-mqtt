@@ -1,8 +1,12 @@
+use super::MqttDataType;
+
 /// MQTT-1.5.5
 #[derive(Debug, PartialEq)]
 pub struct VariableByteInteger {
     pub value: u32,
 }
+
+impl MqttDataType for VariableByteInteger {}
 
 impl VariableByteInteger {
 
@@ -16,6 +20,7 @@ impl VariableByteInteger {
     }
 }
 
+// FIXME change this to TryFrom
 impl From<&[u8]> for VariableByteInteger {
     
     /// Attempts to read an unsigned integer (between 7 and 28 bits) value from one to four bytes
@@ -61,6 +66,14 @@ impl Into<Vec<u8>> for VariableByteInteger {
     }
 }
 
+/* 
+  Blanket trait impls for standard rust types.
+  These map to MQTT spec types `Byte`, `Two Byte Integer` and `Four Byte Integer`
+ */
+impl MqttDataType for u8 {}
+impl MqttDataType for u16 {}
+impl MqttDataType for u32 {}
+
 #[cfg(test)]
 mod tests {
     use std::{vec};
@@ -68,7 +81,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_encode_vbi() {
+    fn encode_vbi() {
         do_test_encode_vbi(16, vec![16]);
         do_test_encode_vbi(128, vec![128, 1]);
         do_test_encode_vbi(129, vec![129, 1]);
@@ -76,14 +89,14 @@ mod tests {
     }
 
     #[test]
-    fn test_decode_vbi() {
+    fn decode_vbi() {
         do_test_decode_vbi(&vec![78], 78);
         do_test_decode_vbi(&vec![129, 1], 129);
         do_test_decode_vbi(&vec![0x80, 0x80, 0x80, 0x01], 2097152);
     }
 
     #[test]
-    fn test_vbi_size() {
+    fn vbi_size() {
         assert_eq!(1, VariableByteInteger{value: 84}.bytes_used());
         assert_eq!(1, VariableByteInteger{value: 127}.bytes_used());
         assert_eq!(2, VariableByteInteger{value: 128}.bytes_used());
