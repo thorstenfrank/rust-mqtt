@@ -1,4 +1,4 @@
-use crate::{VariableByteInteger, types::ReasonCode};
+use crate::{types::{MqttDataType, ReasonCode, VariableByteInteger}, error::MqttError};
 
 use super::{MqttControlPacket, PacketType};
 
@@ -49,17 +49,19 @@ impl ConnackPacket {
     }
 }
 
-impl From<&[u8]> for ConnackPacket {
-    fn from(src: &[u8]) -> Self {
-        // FIXME this really should be try_into so we can use results and error handling
+impl TryFrom<&[u8]> for ConnackPacket {
+    
+    type Error = MqttError;
+
+    fn try_from(src: &[u8]) -> Result<Self, Self::Error> {
         if src[0] != 32 {
-            println!("WARNING: Connack packet started with wrong packet type: {}", src[0]);
+            return Err(MqttError::MalformedPacket(format!("First byte not a CONNACK packet: {:08b}", src[0])))
         }
 
-        let remaining_length = VariableByteInteger::from(&src[1..5]);
+        let remaining_length = VariableByteInteger::try_from(&src[1..5])?;
 
         // the index where the Variable Header begins
-        let mut index = (1 + remaining_length.bytes_used()) as usize;
+        let mut index = remaining_length.encoded_len() + 1;
         
         // TODO should we actually do something with the session present flag if it is set? check the spec
         let session_present = src[index] != 0;
@@ -68,13 +70,8 @@ impl From<&[u8]> for ConnackPacket {
         let reason_code = ReasonCode::try_from(src[index]).unwrap();
 
         // FIXME read the rest, duh!
-        /*
-        index += 1;
-        let props_len = src[index];
-        println!("when I grow up I will process {} bytes of properties!", props_len); 
-        */
 
-        ConnackPacket { session_present, reason_code }
+        Ok(ConnackPacket { session_present, reason_code })
     }
 }
 
@@ -96,10 +93,6 @@ impl MqttControlPacket for ConnackPacket {
     
     fn packet_type() -> PacketType {
         PacketType::CONNACK
-    }
-    
-    fn payload_requirement() -> crate::types::YesNoMaybe {
-        crate::types::YesNoMaybe::None
     }
 }
 
@@ -151,7 +144,7 @@ mod tests {
     }
 
     fn run_decode(binary: &[u8], session_present: bool, reason_code: ReasonCode) {
-        let connack = ConnackPacket::from(binary);
+        let connack = ConnackPacket::try_from(binary).unwrap();
 
         assert_eq!(session_present, connack.session_present);
         assert_eq!(reason_code, connack.reason_code);

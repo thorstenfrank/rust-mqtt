@@ -1,3 +1,5 @@
+use crate::error::MqttError;
+
 use super::MqttDataType;
 
 /// MQTT-1.5.5
@@ -6,10 +8,20 @@ pub struct VariableByteInteger {
     pub value: u32,
 }
 
-impl MqttDataType for VariableByteInteger {}
+impl MqttDataType for VariableByteInteger {
+    fn encoded_len(&self) -> usize {
+        match self.value {
+            x if x <= 127 => 1,
+            x if x <= 16383 => 2,
+            x if x <= 2097151 => 3,
+            _=> 4,
+        }
+    }
+}
 
 impl VariableByteInteger {
 
+    #[deprecated = "Use MqttDataType::byte_size() instead"]
     pub fn bytes_used(&self) -> u8 {
         match self.value {
             x if x <= 127 => 1,
@@ -20,12 +32,12 @@ impl VariableByteInteger {
     }
 }
 
-// FIXME change this to TryFrom
-impl From<&[u8]> for VariableByteInteger {
-    
+impl TryFrom<&[u8]> for VariableByteInteger {
+    type Error = MqttError;
+
     /// Attempts to read an unsigned integer (between 7 and 28 bits) value from one to four bytes
     /// according to the MQTT Spec 1.5.5.
-    fn from(bytes: &[u8]) -> Self {
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         // FIXME add validation (max length = 4)
         let mut value: u32 = 0;
         let mask: u8 = 127;
@@ -42,8 +54,9 @@ impl From<&[u8]> for VariableByteInteger {
             }
         }
 
-        VariableByteInteger { value }
+        Ok(VariableByteInteger { value })
     }
+
 }
 
 impl Into<Vec<u8>> for VariableByteInteger {
@@ -70,9 +83,34 @@ impl Into<Vec<u8>> for VariableByteInteger {
   Blanket trait impls for standard rust types.
   These map to MQTT spec types `Byte`, `Two Byte Integer` and `Four Byte Integer`
  */
-impl MqttDataType for u8 {}
-impl MqttDataType for u16 {}
-impl MqttDataType for u32 {}
+impl MqttDataType for u8 {
+    fn encoded_len(&self) -> usize {
+        // std::mem::size_of::<u8>()
+        1
+    }
+}
+impl MqttDataType for u16 {
+    fn encoded_len(&self) -> usize {
+        2
+    }
+}
+impl MqttDataType for u32 {
+    fn encoded_len(&self) -> usize {
+        4
+    }
+}
+
+pub fn push_be_u16(val: u16, vec: &mut Vec<u8>) {
+    for b in val.to_be_bytes() {
+        vec.push(b)
+    }
+}
+
+pub fn push_be_u32(val: u32, vec: &mut Vec<u8>) {
+    for b in val.to_be_bytes() {
+        vec.push(b)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -97,18 +135,18 @@ mod tests {
 
     #[test]
     fn vbi_size() {
-        assert_eq!(1, VariableByteInteger{value: 84}.bytes_used());
-        assert_eq!(1, VariableByteInteger{value: 127}.bytes_used());
-        assert_eq!(2, VariableByteInteger{value: 128}.bytes_used());
-        assert_eq!(2, VariableByteInteger{value: 8342}.bytes_used());
-        assert_eq!(2, VariableByteInteger{value: 16383}.bytes_used());
-        assert_eq!(3, VariableByteInteger{value: 16384}.bytes_used());
-        assert_eq!(3, VariableByteInteger{value: 2097151}.bytes_used());
-        assert_eq!(4, VariableByteInteger{value: 2097152}.bytes_used());
-        assert_eq!(4, VariableByteInteger{value: 268435455}.bytes_used());
+        assert_eq!(1, VariableByteInteger{value: 84}.encoded_len());
+        assert_eq!(1, VariableByteInteger{value: 127}.encoded_len());
+        assert_eq!(2, VariableByteInteger{value: 128}.encoded_len());
+        assert_eq!(2, VariableByteInteger{value: 8342}.encoded_len());
+        assert_eq!(2, VariableByteInteger{value: 16383}.encoded_len());
+        assert_eq!(3, VariableByteInteger{value: 16384}.encoded_len());
+        assert_eq!(3, VariableByteInteger{value: 2097151}.encoded_len());
+        assert_eq!(4, VariableByteInteger{value: 2097152}.encoded_len());
+        assert_eq!(4, VariableByteInteger{value: 268435455}.encoded_len());
 
         // this is dumb as it exceeds the MQTT spec max value, but hey
-        assert_eq!(4, VariableByteInteger{value: u32::MAX}.bytes_used());
+        assert_eq!(4, VariableByteInteger{value: u32::MAX}.encoded_len());
     }
 
     fn do_test_encode_vbi(value: u32, expect: Vec<u8>) {
@@ -117,7 +155,7 @@ mod tests {
     }
     
     fn do_test_decode_vbi(bytes: &[u8], expect: u32) {
-        let actual = VariableByteInteger::from(bytes);
+        let actual = VariableByteInteger::try_from(bytes).unwrap();
         assert_eq!(expect, actual.value, "error trying to decode into {}", expect);
     }
 

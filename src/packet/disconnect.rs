@@ -1,4 +1,4 @@
-use crate::{types::ReasonCode, error::MqttError, VariableByteInteger};
+use crate::{types::{ReasonCode, VariableByteInteger}, error::MqttError};
 
 use super::{MqttControlPacket, PacketType};
 
@@ -58,10 +58,6 @@ impl Into<Vec<u8>> for DisconnectPacket {
 impl MqttControlPacket for DisconnectPacket {
     fn packet_type() -> PacketType {
         PacketType::DISCONNECT
-    }
-
-    fn payload_requirement() -> crate::types::YesNoMaybe {
-        crate::types::YesNoMaybe::None
     }
 }
 

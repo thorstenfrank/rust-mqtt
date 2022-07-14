@@ -1,3 +1,6 @@
+//! Representations of MQTT data packets.
+//! Includes serialization and deserialization of packets into and from binary.
+
 mod connect;
 mod connack;
 mod disconnect;
@@ -5,9 +8,10 @@ mod disconnect;
 use std::fmt::Display;
 
 use crate::error::MqttError;
-use crate::types::YesNoMaybe;
 
 pub use self::connect::ConnectPacket;
+pub use self::connect::ConnectProperties;
+pub use self::connect::LastWill;
 pub use self::connack::ConnackPacket;
 
 /// MQTT control packet types.
@@ -84,10 +88,8 @@ pub trait MqttControlPacket {
 
     /// Not sure we really need this...
     fn packet_type() -> PacketType;
-
-    /// Whether this packet's payload is mandatory, optional or probibited.
-    fn payload_requirement() -> YesNoMaybe;   
 }
+
 #[cfg(test)]
 mod tests {
     use crate::error::MqttError;

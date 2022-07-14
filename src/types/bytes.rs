@@ -20,9 +20,25 @@ impl BinaryData {
 
         Ok(BinaryData { inner: bytes})
     }
+    
+    /// use [MqttDataType::byte_size()] instead
+    #[deprecated]
+    pub fn len(&self) -> usize {
+        self.inner.len() + 2
+    }
+
+    /// Clones and returns the inner vec of bytes
+    pub fn clone_inner(&self) -> Vec<u8> {
+        self.inner.clone()
+    }
 }
 
-impl MqttDataType for BinaryData {}
+impl MqttDataType for BinaryData {
+    /// The length of the binary data plus 2 bytes for the full binary representation in an MQTT packet.
+    fn encoded_len(&self) -> usize {
+        self.inner.len() + 2
+    }
+}
 
 impl Into<Vec<u8>> for BinaryData {
     
@@ -48,19 +64,20 @@ impl TryFrom<&[u8]> for BinaryData {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() < 2 {
-            return Err(MqttError::Message("".to_string()))
+            return Err(MqttError::Message("Binary data must be at least two bytes long!".to_string()))
         }
 
         let (len, val) = value.split_at(2);
-        let length = u16::from_be_bytes(len.try_into().unwrap());
-        if length as usize != val.len() {
-            return Err(MqttError::Message(format!("Specified [{}] and actual [{}] length of binary data does not match", length, val.len())))
+        let length = u16::from_be_bytes(len.try_into().unwrap()) as usize;
+        if length > val.len() {
+            return Err(MqttError::Message(format!("Message too short. Specified [{}] and actual [{}] length mismatch", length, val.len())))
         }
 
-        let mut inner: Vec<u8> = Vec::with_capacity(val.len());
-        inner.extend_from_slice(val); // copy_from_slice() maybe?
+        let mut inner: Vec<u8> = Vec::with_capacity(length);
+        inner.extend_from_slice(&val[..length]); // copy_from_slice() maybe?
 
-        Ok(BinaryData { inner })
+        // not sure if we really need the length validation from the new() function
+        BinaryData::new(inner)
     }
 }
 
@@ -101,9 +118,16 @@ mod tests {
     }
 
     #[test]
-    fn decode_length_mismatch() {
-        let bytes = [0, 4, 129, 90, 3, 240, 7];
+    fn decode_length_too_short() {
+        let bytes = [0, 6, 129, 90, 3, 240, 7];
         assert!(BinaryData::try_from(&bytes[..]).is_err());
+    }
+
+    #[test]
+    fn decode_extract_from_longer_slice() {
+        let bytes: Vec<u8> = vec![0,29,123,39,115,39,58,39,115,101,110,115,111,114,39,44,39,108,39,58,39,107,105,116,99,104,101,110,39,32,125,0,6,109,121,110,97,109,101];
+        let bin = BinaryData::try_from(&bytes[..]).unwrap();
+        assert_eq!(31, bin.encoded_len());
     }
 
 }

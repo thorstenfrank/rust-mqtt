@@ -1,12 +1,12 @@
 use std::{net::TcpStream, io::{BufReader, Write, Read}};
 
-use mqtt::{packet::{ConnectPacket, ConnackPacket}, UTF8String};
+use mqtt::{packet::{ConnectPacket, ConnackPacket}};
 
 
 fn main() -> std::io::Result<()> {
     let mut stream = TcpStream::connect("127.0.0.1:1883")?;
 
-    let conn = ConnectPacket::new(UTF8String::from_str("WUPPDI"));
+    let conn = ConnectPacket::new("WUPPDI".to_string()).unwrap();
     println!("sending CONNECT: {:?}", conn);
 
     let buf: Vec<u8> = conn.into();
@@ -26,7 +26,7 @@ fn main() -> std::io::Result<()> {
         Ok(len) => {
             println!("read {} bytes from server", len);
             print_bin(&buf[..len]);
-            let connack = ConnackPacket::from(&buf[..]);
+            let connack = ConnackPacket::try_from(&buf[..]).unwrap();
             println!("{:?}", connack)
         },
         Err(e) => println!("error receiving CONNACK: {:?}", e), 
