@@ -29,12 +29,6 @@ impl UTF8String {
         // TODO add validation for UTF-8 compliance
         UTF8String { value: value.to_string() }
     }
-
-    /// Returns number of bytes of this string including the 2 bytes holding the length.
-    #[deprecated = "use MqttDataType::encoded_len() instead"]
-    pub fn len(&self) -> u16 {
-        self.value.len() as u16 + 2 // adds the u16 length field
-    }
 }
 
 impl Into<Vec<u8>> for UTF8String {
@@ -57,7 +51,6 @@ impl Into<Vec<u8>> for UTF8String {
     }
 }
 
-// FIXME change this to TryFrom
 impl TryFrom<&[u8]> for UTF8String {
 
     type Error = MqttError;

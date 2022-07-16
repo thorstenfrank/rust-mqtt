@@ -21,12 +21,6 @@ impl BinaryData {
         Ok(BinaryData { inner: bytes})
     }
     
-    /// use [MqttDataType::byte_size()] instead
-    #[deprecated]
-    pub fn len(&self) -> usize {
-        self.inner.len() + 2
-    }
-
     /// Clones and returns the inner vec of bytes
     pub fn clone_inner(&self) -> Vec<u8> {
         self.inner.clone()

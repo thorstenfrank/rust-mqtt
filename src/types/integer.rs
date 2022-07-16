@@ -19,19 +19,6 @@ impl MqttDataType for VariableByteInteger {
     }
 }
 
-impl VariableByteInteger {
-
-    #[deprecated = "Use MqttDataType::byte_size() instead"]
-    pub fn bytes_used(&self) -> u8 {
-        match self.value {
-            x if x <= 127 => 1,
-            x if x <= 16383 => 2,
-            x if x <= 2097151 => 3,
-            _=> 4,
-        }
-    }
-}
-
 impl TryFrom<&[u8]> for VariableByteInteger {
     type Error = MqttError;
 
@@ -80,7 +67,7 @@ impl Into<Vec<u8>> for VariableByteInteger {
 }
 
 /* 
-  Blanket trait impls for standard rust types.
+  Impls for primitive datatypes.
   These map to MQTT spec types `Byte`, `Two Byte Integer` and `Four Byte Integer`
  */
 impl MqttDataType for u8 {

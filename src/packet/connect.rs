@@ -656,7 +656,7 @@ fn parse_property(src: &[u8], properties: &mut ConnectProperties) -> Result<usiz
                 Err(e) => return Err(MqttError::Message(format!("Error reading property [max packet size]: {:?}", e))),
             };
             bytes_used += 4; // u32
-        }
+        },
         _=> return Err(MqttError::Message(format!("Unknown CONNECT property identifier: {}", src[0])))
     }
     Ok(bytes_used)
