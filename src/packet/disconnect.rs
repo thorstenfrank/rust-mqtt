@@ -1,4 +1,4 @@
-use crate::{types::{ReasonCode, VariableByteInteger}, error::MqttError};
+use crate::{types::ReasonCode, error::MqttError};
 
 use super::{MqttControlPacket, PacketType};
 
