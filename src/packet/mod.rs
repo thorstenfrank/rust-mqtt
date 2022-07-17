@@ -8,6 +8,7 @@ mod disconnect;
 use std::fmt::Display;
 
 use crate::error::MqttError;
+use crate::types::VariableByteInteger;
 
 pub use self::connect::ConnectPacket;
 pub use self::connect::ConnectProperties;
@@ -85,21 +86,54 @@ impl Display for PacketType {
 
 /// Common behavior for MQTT control packets.
 pub trait MqttControlPacket {
-
+    
     /// Not sure we really need this...
     fn packet_type() -> PacketType;
+
+}
+
+/// The fixed header part of an MQTT packet includes the 'remaining length' starting with the second byte
+const LENGTH_START_INDEX: usize = 1;
+
+/// Subtracts 1 from the vec's length (because we're assuming the first byte is the packet type and flags), creates a
+/// [`VariableByteInteger`] from it and then calls [`insert()`].
+fn calculate_and_insert_length(packet: &mut Vec<u8>) {
+    insert(VariableByteInteger { value: (packet.len() - 1) as u32 }, LENGTH_START_INDEX, packet)
+}
+
+/// Encodes the VBI into its binary representation and then inserts those bytes at the specified index.
+fn insert(val: VariableByteInteger, start_index: usize, binary: &mut Vec<u8>) {
+    let mut index = start_index;
+    let encoded: Vec<u8> = val.into();
+    for b in encoded {
+        binary.insert(index, b);
+        index += 1;
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::error::MqttError;
 
-    use super::PacketType;
+    use super::{PacketType, calculate_and_insert_length};
 
     #[test]
-    fn test() {
-        assert_eq!(1, PacketType::CONNECT as u8);
-        assert_eq!(2, PacketType::CONNACK as u8);
+    fn calculate_and_insert() {
+        let mut short: Vec<u8> = vec![0; 45];
+        calculate_and_insert_length(&mut short);
+
+        assert_eq!(46, short.len());
+        assert_eq!(44, short[1]);
+
+        let mut long: Vec<u8> = vec![0; 2_097_151];
+        calculate_and_insert_length(&mut long);
+
+        assert_eq!(2_097_154, long.len());
+        assert_eq!(254, long[1]);
+        assert_eq!(255, long[2]);
+        assert_eq!(127, long[3]);
+        assert_eq!(0, long[4]);
+        //do_test_encode_vbi(2097151, vec![0xFF, 0xFF, 0x7F]);
     }
 
     #[test]
@@ -130,4 +164,5 @@ mod tests {
         let res = PacketType::try_from(numeric);
         assert_eq!(expected, res.unwrap());
     }
+
 }

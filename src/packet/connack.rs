@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{types::{MqttDataType, ReasonCode, VariableByteInteger, QoS, UTF8String, BinaryData, push_be_u32, push_be_u16}, error::MqttError};
+use crate::{types::{MqttDataType, ReasonCode, VariableByteInteger, QoS, UTF8String, BinaryData, push_be_u32, push_be_u16}, error::MqttError, packet::calculate_and_insert_length};
 
 use super::{MqttControlPacket, PacketType};
 
@@ -106,9 +106,6 @@ impl TryFrom<&[u8]> for ConnackPacket {
 impl Into<Vec<u8>> for ConnackPacket {
     
     fn into(self) -> Vec<u8> {
-        // where the overall length will be inserted
-        const LEN_INDEX: usize = 1;
-
         let mut packet: Vec<u8> = Vec::new();
 
         packet.push(FIRST_BYTE);
@@ -125,20 +122,10 @@ impl Into<Vec<u8>> for ConnackPacket {
             },
         };
 
-        // Finally calculate the 'remaining length' and insert into the fixed header
-        // don't include the fixed header itself
-        insert(VariableByteInteger {value: (packet.len() - 1) as u32}, LEN_INDEX, &mut packet);
+
+        calculate_and_insert_length(&mut packet);
 
         packet
-    }
-}
-
-fn insert(val: VariableByteInteger, start_index: usize, binary: &mut Vec<u8>) {
-    let mut index = start_index;
-    let encoded: Vec<u8> = val.into();
-    for b in encoded {
-        binary.insert(index, b);
-        index += 1;
     }
 }
 

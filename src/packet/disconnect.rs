@@ -22,14 +22,6 @@ pub struct DisconnectPacket {
     // properties...
 }
 
-impl DisconnectPacket {
-    fn remaining_length(&self) -> VariableByteInteger {
-        let value: u32 = 2; // 1 Byte for the reason code, 1 Byte for the properties length
-
-        VariableByteInteger { value }
-    }
-}
-
 impl TryFrom<&[u8]> for DisconnectPacket {
     type Error = MqttError;
 
@@ -45,12 +37,15 @@ impl TryFrom<&[u8]> for DisconnectPacket {
 impl Into<Vec<u8>> for DisconnectPacket {
     fn into(self) -> Vec<u8> {
         let mut packet: Vec<u8> = Vec::new();
-        let mut length: Vec<u8> = self.remaining_length().into();
 
         packet.push(FIRST_BYTE);
-        packet.append(&mut length);
+        
         packet.push(self.reason_code.into());
         packet.push(0); // properties length
+
+
+        super::calculate_and_insert_length(&mut packet);
+
         packet
     }
 }
@@ -107,11 +102,5 @@ mod tests {
         assert!(res.is_err(), "expected a MalformedPacket error");
         assert_eq!(Some(MqttError::MalformedPacket(format!("Invalid packet identifier for DISCONNECT: 00100000"))), res.err());
         
-    }
-
-    #[test]
-    fn remaining_length() {
-        let disconnect = DisconnectPacket {reason_code: ReasonCode::Success};
-        assert_eq!(VariableByteInteger { value: 2 }, disconnect.remaining_length());
     }
 }

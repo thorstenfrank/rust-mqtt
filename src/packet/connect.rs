@@ -210,13 +210,8 @@ impl Into<Vec<u8>> for ConnectPacket {
             packet.append(&mut pwd.into());
         }
 
-        let length = packet.len() - 1; // total length excluding the first byte as well as any bytes for the length
-        let remaining_length: Vec<u8> = VariableByteInteger{value: length as u32}.into();
-        let mut index = 1;
-        for b in remaining_length {
-            packet.insert(index, b);
-            index += 1;
-        }
+        super::calculate_and_insert_length(&mut packet);
+
         packet        
     }
 }
