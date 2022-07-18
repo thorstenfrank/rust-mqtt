@@ -87,18 +87,6 @@ impl MqttDataType for u32 {
     }
 }
 
-pub fn push_be_u16(val: u16, vec: &mut Vec<u8>) {
-    for b in val.to_be_bytes() {
-        vec.push(b)
-    }
-}
-
-pub fn push_be_u32(val: u32, vec: &mut Vec<u8>) {
-    for b in val.to_be_bytes() {
-        vec.push(b)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::{vec};

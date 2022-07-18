@@ -1,8 +1,8 @@
 use std::{collections::HashMap};
 
-use crate::{error::MqttError, types::{QoS, BinaryData, UTF8String, VariableByteInteger, MqttDataType, push_be_u16, push_be_u32}};
+use crate::{error::MqttError, types::{QoS, BinaryData, UTF8String, VariableByteInteger, MqttDataType}};
 
-use super::{MqttControlPacket, PacketType};
+use super::{MqttControlPacket, PacketType, push_be_u32, push_be_u16};
 
 /// 23 characters. The spec says longer client IDs _may_ be used, depending on the server, but servers are not
 /// required to, so we'll just cap it there for now.

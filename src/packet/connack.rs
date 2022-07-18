@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use crate::{types::{MqttDataType, ReasonCode, VariableByteInteger, QoS, UTF8String, BinaryData, push_be_u32, push_be_u16}, error::MqttError, packet::calculate_and_insert_length};
+use crate::{types::{MqttDataType, ReasonCode, VariableByteInteger, QoS, UTF8String, BinaryData}, error::MqttError, packet::calculate_and_insert_length};
 
-use super::{MqttControlPacket, PacketType};
+use super::{MqttControlPacket, PacketType, push_be_u32, push_be_u16};
 
 const FIRST_BYTE: u8 = 0b00100000;
 /// 

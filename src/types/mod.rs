@@ -6,7 +6,7 @@ mod qos;
 
 pub use self::bytes::BinaryData;
 pub use self::codes::ReasonCode;
-pub use self::integer::{VariableByteInteger, push_be_u16, push_be_u32};
+pub use self::integer::VariableByteInteger;
 pub use self::string::UTF8String;
 pub use self::qos::QoS;
 

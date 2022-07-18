@@ -92,6 +92,18 @@ pub trait MqttControlPacket {
 
 }
 
+fn push_be_u16(val: u16, vec: &mut Vec<u8>) {
+    for b in val.to_be_bytes() {
+        vec.push(b)
+    }
+}
+
+fn push_be_u32(val: u32, vec: &mut Vec<u8>) {
+    for b in val.to_be_bytes() {
+        vec.push(b)
+    }
+}
+
 /// The fixed header part of an MQTT packet includes the 'remaining length' starting with the second byte
 const LENGTH_START_INDEX: usize = 1;
 
