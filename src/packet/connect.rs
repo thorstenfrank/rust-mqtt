@@ -689,7 +689,7 @@ mod tests {
 
     #[test]
     fn encode_with_will() {
-        let expect: Vec<u8> = vec![16,87,0,4,77,81,84,84,5,238,0,60,8,17,0,0,0,120,33,0,1,0,0,0,0,10,47,108,97,115,116,47,119,105,108,108,0,29,123,39,115,39,58,39,115,101,110,115,111,114,39,44,39,108,39,58,39,107,105,116,99,104,101,110,39,32,125,0,6,109,121,110,97,109,101,0,12,115,117,112,101,114,83,101,99,114,101,116,33];
+        let expect: Vec<u8> = vec![16,86,0,4,77,81,84,84,5,238,0,60,8,17,0,0,0,120,33,0,1,0,0,0,0,10,47,108,97,115,116,47,119,105,108,108,0,28,123,34,115,34,58,34,115,101,110,115,111,114,34,44,34,108,34,58,34,107,105,116,99,104,101,110,34,125,0,6,109,121,110,97,109,101,0,12,115,117,112,101,114,83,101,99,114,101,116,33];
         let mut packet = ConnectPacket::new(String::new()).unwrap();
         packet.clean_start = true;
         packet.keep_alive = 60;
@@ -703,7 +703,7 @@ mod tests {
 
         let mut will = LastWill::new(
             "/last/will".to_string(),
-            "{'s':'sensor','l':'kitchen' }".to_string().as_bytes()
+            r#"{"s":"sensor","l":"kitchen"}"#.to_string().as_bytes()
         ).unwrap();
         will.retain = true;
         packet.will = Some(will);
@@ -760,7 +760,7 @@ mod tests {
 
     #[test]
     fn decode_will() {
-        let binary = vec![16,87,0,4,77,81,84,84,5,238,0,60,8,17,0,0,0,120,33,0,1,0,0,0,0,10,47,108,97,115,116,47,119,105,108,108,0,29,123,39,115,39,58,39,115,101,110,115,111,114,39,44,39,108,39,58,39,107,105,116,99,104,101,110,39,32,125,0,6,109,121,110,97,109,101,0,12,115,117,112,101,114,83,101,99,114,101,116,33];
+        let binary = vec![16,86,0,4,77,81,84,84,5,238,0,60,8,17,0,0,0,120,33,0,1,0,0,0,0,10,47,108,97,115,116,47,119,105,108,108,0,28,123,34,115,34,58,34,115,101,110,115,111,114,34,44,34,108,34,58,34,107,105,116,99,104,101,110,34,125,0,6,109,121,110,97,109,101,0,12,115,117,112,101,114,83,101,99,114,101,116,33];
         let decoded = ConnectPacket::try_from(&binary[..]).unwrap();
         assert_eq!(Some(UTF8String::from_str("myname")), decoded.username);
         assert!(decoded.clean_start);
@@ -771,9 +771,9 @@ mod tests {
 
         let will = decoded.will.expect("Last Will should have been decoded!");
         assert_eq!(UTF8String::from_str("/last/will"), will.will_topic);
-        
+
         let will_payload = String::from_utf8(will.will_payload.clone_inner()).unwrap();
-        assert_eq!("{'s':'sensor','l':'kitchen' }".to_string(), will_payload);
+        assert_eq!(r#"{"s":"sensor","l":"kitchen"}"#.to_string(), will_payload);
 
         assert_eq!(QoS::AtLeastOnce, will.qos);
     }
