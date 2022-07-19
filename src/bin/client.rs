@@ -6,7 +6,7 @@ use mqtt::{packet::{ConnectPacket, ConnackPacket}};
 fn main() -> std::io::Result<()> {
     let mut stream = TcpStream::connect("127.0.0.1:1883")?;
 
-    let conn = ConnectPacket::new("WUPPDI".to_string()).unwrap();
+    let conn = ConnectPacket::with_client_id_str("my-rust-mqtt-client-0").unwrap();
     println!("sending CONNECT: {:?}", conn);
 
     let buf: Vec<u8> = conn.into();

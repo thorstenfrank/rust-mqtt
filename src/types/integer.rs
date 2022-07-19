@@ -1,8 +1,13 @@
+//! Primarily implement the Variable Byte Integer type, but also adds trait impls for basic rust types.
+
 use crate::error::MqttError;
 
 use super::MqttDataType;
 
-/// MQTT-1.5.5
+/// Unsigned, Big-Endian integer value, represented from 8 to 24 bits.
+/// See [MQTT-1.5.5](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901011).
+/// 
+/// Internally uses a `u32`, but encodes to 1-4 bytes depending on the value.
 #[derive(Debug, PartialEq)]
 pub struct VariableByteInteger {
     pub value: u32,

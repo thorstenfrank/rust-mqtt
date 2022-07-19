@@ -50,7 +50,7 @@ impl Into<Vec<u8>> for DisconnectPacket {
     }
 }
 
-impl MqttControlPacket for DisconnectPacket {
+impl MqttControlPacket<'_> for DisconnectPacket {
     fn packet_type() -> PacketType {
         PacketType::DISCONNECT
     }

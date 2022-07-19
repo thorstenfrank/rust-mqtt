@@ -1,6 +1,7 @@
 use crate::error::MqttError;
 
 /// Quality of Service levels.
+/// See [the spec](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901234).
 #[derive(Debug, PartialEq, PartialOrd, Copy, Clone)]
 pub enum QoS {
     AtMostOnce = 0,

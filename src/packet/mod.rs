@@ -1,5 +1,9 @@
 //! Representations of MQTT data packets.
 //! Includes serialization and deserialization of packets into and from binary.
+//! 
+//! The "API" of these packets all use standard rust data types that map directly to MQTT types. See the 
+//! [`type` module-level documentation](crate::types). These protocol-specific types are used for encoding/decoding 
+//! only..
 
 mod connect;
 mod connack;
@@ -10,10 +14,8 @@ use std::fmt::Display;
 use crate::error::MqttError;
 use crate::types::VariableByteInteger;
 
-pub use self::connect::ConnectPacket;
-pub use self::connect::ConnectProperties;
-pub use self::connect::LastWill;
-pub use self::connack::ConnackPacket;
+pub use self::connect::{ConnectPacket, ConnectProperties, LastWill};
+pub use self::connack::{ConnackPacket, ConnackProperties};
 
 /// MQTT control packet types.
 #[derive(Debug, PartialEq, Eq)]
@@ -85,19 +87,23 @@ impl Display for PacketType {
 }
 
 /// Common behavior for MQTT control packets.
-pub trait MqttControlPacket {
+/// 
+/// At the very least, it is expected that a packet can be transformed into and parsed from binary format.
+pub trait MqttControlPacket<'a>: Into<Vec<u8>> + TryFrom<&'a [u8]> {
     
     /// Not sure we really need this...
     fn packet_type() -> PacketType;
 
 }
 
+/// Converts `val` into two Big-Endian bytes and appends them to `vec`.
 fn push_be_u16(val: u16, vec: &mut Vec<u8>) {
     for b in val.to_be_bytes() {
         vec.push(b)
     }
 }
 
+/// Converts `val` into four Big-Endian bytes and appends them to `vec`.
 fn push_be_u32(val: u32, vec: &mut Vec<u8>) {
     for b in val.to_be_bytes() {
         vec.push(b)

@@ -1,7 +1,8 @@
 use crate::error::MqttError;
 
 /// MQTT-3.2.2.2: Connect Reason Codes, a single byte numeric value.
-/// If the server sends a CONNACK with a reason code >= 128, it MUST close the network connection.
+/// Anything above 0x80 is considered an error. 
+/// See the spec for details.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ReasonCode {
     Success = 0x00,
@@ -30,6 +31,7 @@ pub enum ReasonCode {
 
 impl ReasonCode {
 
+    /// Returns `true` if the reason code has a numeric value of 0x80 or higher.
     pub fn is_err(&self) -> bool {
         let num = *self as u8;
         num <= 128

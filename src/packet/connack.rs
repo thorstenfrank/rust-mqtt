@@ -1,65 +1,82 @@
 use std::collections::HashMap;
 
-use crate::{types::{MqttDataType, ReasonCode, VariableByteInteger, QoS, UTF8String, BinaryData}, error::MqttError, packet::calculate_and_insert_length};
+use crate::{types::*, error::MqttError, packet::calculate_and_insert_length};
 
 use super::{MqttControlPacket, PacketType, push_be_u32, push_be_u16};
 
 const FIRST_BYTE: u8 = 0b00100000;
-/// 
-/// Fixed header (packet type 2 | reserved 0)
-/// 0010 0000
-/// remaining length
-/// 
-/// Variable Header
-///     ack flags (1 byte) [bit 0 = session present), all others = 0]
-///     reason code (1 byte)
-///     Properties:
-///         length: VBI
-///         session expiry interval
-///         receive max
-///         max qos
-///         retain available
-///         max packet size
-///         assigned client id
-///         topic alias max
-///         reason string
-///         user property*
-///         wildcard subscription available
-///         subscription ids available
-///         shared sub available
-///         server keep alive
-///         response info
-///         server reference
-///         auth method
-///         auth data
-/// 
-/// NO payload
+/// A `CONNACK` MQTT control packet.
 #[derive(Debug)]
 pub struct ConnackPacket {
+
+    /// Whether this connect/connack exchange resumes an existing session or starts a new one.
     pub session_present: bool,
+
+    /// Indicates whether the connection attempt was successful, and if not why.
+    /// [Anything above 0x80 is an error](crate::types::ReasonCode::is_err()).
     pub reason_code: ReasonCode,
+
+    /// Optional properties sent by the server.
     pub properties: Option<ConnackProperties>,
 }
 
+/// Sums up all properties a server may send.
 #[derive(Debug)]
 pub struct ConnackProperties {
-    session_expiry_interval: Option<u32>,
-    receive_maximum: Option<u16>,
-    maximum_qos: Option<QoS>,
-    retain_available: bool,
-    max_packet_size: Option<u32>,
-    assigned_client_id: Option<UTF8String>,
-    topic_alias_max: Option<u16>,
-    reason_string: Option<UTF8String>,
-    user_properties: HashMap<UTF8String, UTF8String>,
-    wildcard_subscription_available: bool,
-    subscription_ids_available: bool,
-    shared_subscription_available: bool,
-    server_keep_alive: Option<u16>,
-    response_info: Option<UTF8String>,
-    server_reference: Option<UTF8String>,
-    auth_method: Option<UTF8String>,
-    auth_data: Option<BinaryData>,
+
+    /// Server override for an interval requested by the client 
+    /// [with the CONNECT properties](super::ConnectProperties::session_expiry_interval).
+    pub session_expiry_interval: Option<u32>,
+
+    /// Limits on concurrent QoS 1 and 2 messages.
+    pub receive_maximum: Option<u16>,
+
+    /// Limits the maximum quality of service level the server supports.
+    /// Defaults to [QoS 2](crate::types::QoS::ExactlyOnce).
+    pub maximum_qos: Option<QoS>,
+
+    /// Whether or not the server supports message retention for will messages.
+    pub retain_available: bool,
+
+    /// Maximum size in number of bytes the server is willing to accept.
+    pub max_packet_size: Option<u32>,
+
+    /// Server-issued in cases where the client does not specify its own ID with the `CONNECT` packet.
+    pub assigned_client_id: Option<String>,
+
+    /// Maximum number of numeric aliases the server allows.
+    pub topic_alias_max: Option<u16>,
+
+    /// Additional human-readable information from the server.
+    pub reason_string: Option<String>,
+
+    /// Generic key-value properties.
+    pub user_properties: HashMap<String, String>,
+
+    /// 
+    pub wildcard_subscription_available: bool,
+
+    ///
+    pub subscription_ids_available: bool,
+
+    ///
+    pub shared_subscription_available: bool,
+
+    ///
+    pub server_keep_alive: Option<u16>,
+
+    /// Application-level instructions on how to build the response topic such as the base of the topic tree.
+    pub response_info: Option<String>,
+
+    /// Used in conjunction with [reason code 0x9C](crate::types::ReasonCode::UseAnotherServer) to define a different
+    /// server for the client to use.
+    pub server_reference: Option<String>,
+
+    /// Application-specific auth method
+    pub auth_method: Option<String>,
+
+    /// Application-specific auth data
+    pub auth_data: Option<Vec<u8>>,
 }
 
 impl TryFrom<&[u8]> for ConnackPacket {
@@ -102,7 +119,6 @@ impl TryFrom<&[u8]> for ConnackPacket {
     }
 }
 
-// FIXME change this to Try_Into
 impl Into<Vec<u8>> for ConnackPacket {
     
     fn into(self) -> Vec<u8> {
@@ -122,14 +138,13 @@ impl Into<Vec<u8>> for ConnackPacket {
             },
         };
 
-
         calculate_and_insert_length(&mut packet);
 
         packet
     }
 }
 
-impl MqttControlPacket for ConnackPacket {
+impl MqttControlPacket<'_> for ConnackPacket {
     
     fn packet_type() -> PacketType {
         PacketType::CONNACK
@@ -182,7 +197,7 @@ impl TryFrom<&[u8]> for ConnackProperties {
                 18 => {
                     let assigned_client_id = UTF8String::try_from(&src[cursor..])?;
                     cursor += assigned_client_id.encoded_len();
-                    properties.assigned_client_id = Some(assigned_client_id);
+                    properties.assigned_client_id = assigned_client_id.value;
                 },
                 19 => {
                     match src[cursor..cursor + 2].try_into() {
@@ -194,27 +209,27 @@ impl TryFrom<&[u8]> for ConnackProperties {
                 21 => {
                     let auth_method = UTF8String::try_from(&src[..])?;
                     cursor += auth_method.encoded_len();
-                    properties.auth_method = Some(auth_method);
+                    properties.auth_method = auth_method.value;
                 },
                 22 => {
                     let auth_data = BinaryData::try_from(&src[..])?;
                     cursor += auth_data.encoded_len();
-                    properties.auth_data = Some(auth_data);
+                    properties.auth_data = Some(auth_data.clone_inner());
                 },
                 26 => {
                     let response_info = UTF8String::try_from(&src[cursor..])?;
                     cursor += response_info.encoded_len();
-                    properties.response_info = Some(response_info);
+                    properties.response_info = response_info.value;
                 },
                 28 => {
                     let server_reference = UTF8String::try_from(&src[cursor..])?;
                     cursor += server_reference.encoded_len();
-                    properties.server_reference = Some(server_reference);
+                    properties.server_reference = server_reference.value;
                 },
                 31 => {
                     let reason_string = UTF8String::try_from(&src[cursor..])?;
                     cursor += reason_string.encoded_len();
-                    properties.reason_string = Some(reason_string);
+                    properties.reason_string = reason_string.value;
                 },
                 33 => {
                     match src[cursor..cursor + 2].try_into() {
@@ -249,7 +264,13 @@ impl TryFrom<&[u8]> for ConnackProperties {
                     cursor += key.encoded_len();
                     let val = UTF8String::try_from(&src[cursor..])?;
                     cursor += val.encoded_len();
-                    properties.user_properties.insert(key, val);
+
+                    // only save this property if we have a key with actual data
+                    if let Some(s) = key.value {
+                        properties.user_properties.insert(s, val.value.unwrap_or(String::new()));
+                    } else {
+                        println!("[CONNACK] User Property with empty key found, skipping");
+                    }
                 },
                 39 => {
                     match src[cursor..cursor + 4].try_into() {
@@ -297,13 +318,12 @@ impl Into<Vec<u8>> for ConnackProperties {
     fn into(self) -> Vec<u8> {
         let mut vec = Vec::new();
 
-        encode_and_append(18, self.assigned_client_id, &mut vec);
+        if let Some(s) = self.assigned_client_id {
+            encode_and_append(18, Some(UTF8String::from(s)), &mut vec);
+        }
+        
         encode_and_append(22, self.auth_data, &mut vec);
         encode_and_append(21, self.auth_method, &mut vec);
-        if let Some(val) = self.max_packet_size {
-            vec.push(39);
-            push_be_u32(val, &mut vec);
-        }
         if let Some(val) = self.max_packet_size {
             vec.push(39);
             push_be_u32(val, &mut vec);
@@ -312,17 +332,23 @@ impl Into<Vec<u8>> for ConnackProperties {
             vec.push(36);
             vec.push(val.into());
         }
-        encode_and_append(31, self.reason_string, &mut vec);
+        if let Some(s) = self.reason_string {
+            encode_and_append(31, Some(UTF8String::from(s)), &mut vec);
+        }
         if let Some(val) = self.receive_maximum {
             vec.push(33);
             push_be_u16(val, &mut vec);
         }
-        encode_and_append(26, self.response_info, &mut vec);
+        if let Some(s) = self.response_info {
+            encode_and_append(26, Some(UTF8String::from(s)), &mut vec);
+        }
         if let Some(val) = self.server_keep_alive {
             vec.push(19);
             push_be_u16(val, &mut vec);
         }
-        encode_and_append(28, self.server_reference, &mut vec);
+        if let Some(s) = self.server_reference {
+            encode_and_append(28, Some(UTF8String::from(s)), &mut vec);
+        }
         if let Some(val) = self.session_expiry_interval {
             vec.push(17);
             push_be_u32(val, &mut vec);
@@ -344,6 +370,10 @@ impl Into<Vec<u8>> for ConnackProperties {
             vec.push(0);
         }
         
+        for (k, v) in self.user_properties {
+            encode_and_append(38, Some(UTF8StringPair::new(k, v)), &mut vec);
+        }
+
         // insert the length
         let mut result: Vec<u8> = VariableByteInteger { value: vec.len() as u32}.into();
         result.append(&mut vec);
@@ -423,7 +453,7 @@ mod tests {
     #[test]
     fn encode_with_properties() {
         let mut properties = ConnackProperties::default();
-        properties.assigned_client_id = Some(UTF8String::from_str("generated-123456"));
+        properties.assigned_client_id = Some("generated-123456".into());
         properties.server_keep_alive = Some(135);
         let connack = ConnackPacket { session_present: true, reason_code: ReasonCode::Success, properties: Some(properties) };
         let actual: Vec<u8> = connack.into();
