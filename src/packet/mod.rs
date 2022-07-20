@@ -4,10 +4,16 @@
 //! The "API" of these packets all use standard rust data types that map directly to MQTT types. See the 
 //! [`type` module-level documentation](crate::types). These protocol-specific types are used for encoding/decoding 
 //! only..
+//! 
+//! The primary structs representing the [PacketType]s group fields together in sub-structs as they seem most logical
+//! to use from an API perspective. There is no separation into fixed header, variable header and payload in the way 
+//! the spec makes these distinctions. It is the internal encoding/decoding logic's responsibility to make sure these
+//! are mapped properly.
 
 mod connect;
 mod connack;
 mod disconnect;
+mod properties;
 
 use std::fmt::Display;
 

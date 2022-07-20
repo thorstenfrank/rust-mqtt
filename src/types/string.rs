@@ -14,9 +14,10 @@ pub struct UTF8String {
 
 /// Just two [UTF8String]s in a row. 
 /// See [the spec](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901013).
+#[derive(Debug, PartialEq)]
 pub struct UTF8StringPair {
-    key: UTF8String,
-    value: UTF8String,
+    pub key: UTF8String,
+    pub value: UTF8String,
 }
 
 impl MqttDataType for UTF8String {

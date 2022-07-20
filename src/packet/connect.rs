@@ -679,7 +679,7 @@ fn validate_client_id(client_id: &String) -> Result<(), MqttError> {
     Ok(())
 }
 
-/// TODO clean this up, this is ugly AF. IDs and data types of properties are finite, so we should be able to solve this a little more generic
+/// TODO clean this up, this is ugly AF. IDs and data types of properties are finite, so we should be able to solve this a little more generically.
 fn parse_property(src: &[u8], properties: &mut ConnectProperties) -> Result<usize, MqttError> {
     let mut bytes_used = 1; // we're always reading the ID field;
     let (identifier, remain) = src.split_at(1);

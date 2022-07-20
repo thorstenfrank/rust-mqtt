@@ -51,6 +51,12 @@ impl TryFrom<&[u8]> for VariableByteInteger {
 
 }
 
+impl From<u32> for VariableByteInteger {
+    fn from(value: u32) -> Self {
+        VariableByteInteger { value }
+    }
+}
+
 impl Into<Vec<u8>> for VariableByteInteger {
 
     /// Converts an unsigned integer (max 28 bits) into the binary representation according to MQTT Spec 1.5.5.
@@ -58,6 +64,10 @@ impl Into<Vec<u8>> for VariableByteInteger {
         // FIXME add validation to make sure the value does not exceed the max (268,435,455)
         let mut res: Vec<u8> = Vec::new();
         let mut val = self.value;
+
+        if val == 0 {
+            return vec![0]
+        }
 
         while val > 0 {
             let mut byte: u8 = (val % 128) as u8;
@@ -100,6 +110,7 @@ mod tests {
 
     #[test]
     fn encode_vbi() {
+        do_test_encode_vbi(0, vec![0]);
         do_test_encode_vbi(16, vec![16]);
         do_test_encode_vbi(128, vec![128, 1]);
         do_test_encode_vbi(129, vec![129, 1]);
@@ -111,6 +122,7 @@ mod tests {
         do_test_decode_vbi(&vec![78], 78);
         do_test_decode_vbi(&vec![129, 1], 129);
         do_test_decode_vbi(&vec![0x80, 0x80, 0x80, 0x01], 2097152);
+        do_test_decode_vbi(&vec![0], 0);
     }
 
     #[test]
