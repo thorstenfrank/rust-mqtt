@@ -107,7 +107,7 @@ impl Into<Vec<u8>> for DisconnectPacket {
                 }
                 if let Some(v) = props.server_reference {
                     length += super::properties::encode_and_append_property(
-                        PropertyIdentifier::ReasonString, 
+                        PropertyIdentifier::ServerReference, 
                         DataRepresentation::UTF8(UTF8String::from(v)), 
                         &mut packet);
                 }
