@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{types::{ReasonCode, VariableByteInteger, MqttDataType, UTF8String, UTF8StringPair}, error::MqttError, packet::properties::{PropertyIdentifier, DataRepresentation}};
 
-use super::{MqttControlPacket, PacketType, properties::{PropertyProcessor, MqttProperty, parse_properties}};
+use super::{MqttControlPacket, PacketType, properties::{PropertyProcessor, MqttProperty}};
 
 /// The first byte with packet identifier and flags is static for DISCONNECT packets
 const FIRST_BYTE: u8 = 0b011100000;
@@ -69,7 +69,7 @@ impl TryFrom<&[u8]> for DisconnectPacket {
                 let reason_code = ReasonCode::try_from(src[cursor])?;
                 cursor += 1;
                 let mut properties = DisconnectProperties::default();
-                parse_properties(&src[cursor..], &mut properties)?;
+                super::properties::parse_properties(&src[cursor..], &mut properties)?;
                 (reason_code, Some(properties))
             }
         };
@@ -94,25 +94,25 @@ impl Into<Vec<u8>> for DisconnectPacket {
             Some(props) => {
                 let mut length = 0;
                 if let Some(v) = props.session_expiry_interval {
-                    length += encode_and_append(
+                    length += super::properties::encode_and_append_property(
                         PropertyIdentifier::SessionExpiryInterval, 
                         DataRepresentation::FourByteInt(v), 
                         &mut packet);
                 }
                 if let Some(v) = props.reason_string {
-                    length += encode_and_append(
+                    length += super::properties::encode_and_append_property(
                         PropertyIdentifier::ReasonString, 
                         DataRepresentation::UTF8(UTF8String::from(v)), 
                         &mut packet);
                 }
                 if let Some(v) = props.server_reference {
-                    length += encode_and_append(
+                    length += super::properties::encode_and_append_property(
                         PropertyIdentifier::ReasonString, 
                         DataRepresentation::UTF8(UTF8String::from(v)), 
                         &mut packet);
                 }
                 for (k, v) in props.user_properties {
-                    length += encode_and_append(
+                    length += super::properties::encode_and_append_property(
                         PropertyIdentifier::UserProperty, 
                         DataRepresentation::UTF8Pair(UTF8StringPair::new(k, v)), 
                         &mut packet);
@@ -122,21 +122,13 @@ impl Into<Vec<u8>> for DisconnectPacket {
         };
 
         // insert property length first
-        super::insert(VariableByteInteger::from(property_length), 2, &mut packet);
+        super::encode_and_insert(VariableByteInteger::from(property_length), 2, &mut packet);
 
         // then the "remaining length"
         super::calculate_and_insert_length(&mut packet);
 
         packet
     }
-}
-
-fn encode_and_append(identifier: PropertyIdentifier, value: DataRepresentation, target: &mut Vec<u8>) -> u32 {
-    // yeah, this isn't super safe...
-    let len = value.encoded_len() as u32 + 1;
-    let mut property: Vec<u8> = MqttProperty { identifier, value }.into();
-    target.append(&mut property);
-    len
 }
 
 impl MqttControlPacket<'_> for DisconnectPacket {

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use crate::{error::MqttError, types::{QoS, BinaryData, UTF8String, VariableByteInteger, MqttDataType}};
 
-use super::{MqttControlPacket, PacketType, push_be_u32, push_be_u16};
+use super::{MqttControlPacket, PacketType, push_be_u32, push_be_u16, properties::{PropertyProcessor, MqttProperty, parse_properties, PropertyIdentifier, DataRepresentation}};
 
 /// 23 characters. The spec says longer client IDs _may_ be used, depending on the server, but servers are not
 /// required to, so we'll just cap it there for now.
@@ -217,7 +217,7 @@ impl ConnectPacket {
 
     /// Inserts or updates a `user property`.
     pub fn set_user_property(&mut self, key: String, value: String) {
-        let props = self.properties.get_or_insert(ConnectProperties::new());
+        let props = self.properties.get_or_insert(ConnectProperties::default());
         props.user_properties.insert(key, value);
     }
 }
@@ -271,10 +271,10 @@ impl Into<Vec<u8>> for ConnectPacket {
         }
         
         // properties
-        if self.properties.is_some() {
-            packet.append(&mut self.properties.unwrap().into());
+        if let Some(p) = self.properties {
+            packet.append(&mut p.into())
         } else {
-            packet.push(0);
+            packet.push(0)
         }
 
         // client id
@@ -361,17 +361,9 @@ impl TryFrom<&[u8]> for ConnectPacket {
         // Properties
         cursor = cursor_stop;
         
-        let props_length = VariableByteInteger::try_from(&value[cursor..])?;
-        cursor += props_length.encoded_len();
-
-        match props_length.value {
-            0 => println!("Properties length is 0, skipping"),
-            _=> {
-                cursor_stop = cursor + props_length.value as usize;
-                packet.properties = Some(ConnectProperties::try_from(&value[cursor..cursor_stop])?);
-                cursor = cursor_stop;
-            }
-        };
+        let mut properties = ConnectProperties::default();
+        cursor += parse_properties(&value[cursor..], &mut properties)?;
+        packet.properties = Some(properties);
 
         // PAYLOAD
         // The Payload of the CONNECT packet contains one or more length-prefixed fields, whose presence is determined 
@@ -445,9 +437,9 @@ impl TryFrom<&[u8]> for ConnectPacket {
     }
 }
 
-impl ConnectProperties {
-    pub fn new() -> Self {
-        ConnectProperties { 
+impl Default for ConnectProperties {
+    fn default() -> Self {
+        Self { 
             session_expiry_interval: None, 
             receive_maximum: None, 
             max_packet_size: None, 
@@ -461,11 +453,12 @@ impl ConnectProperties {
     }
 }
 
+// FIXME delete this once the property processor inpl is finished
 impl TryFrom<&[u8]> for ConnectProperties {
     type Error = MqttError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        let mut result = ConnectProperties::new();
+        let mut result = ConnectProperties::default();
         
         let mut cursor: usize = 0;
         while cursor < value.len() {
@@ -473,6 +466,62 @@ impl TryFrom<&[u8]> for ConnectProperties {
         }
 
         Ok(result)
+    }
+}
+
+impl PropertyProcessor for ConnectProperties {
+    fn process(&mut self, property: MqttProperty) -> Result<(), MqttError> {
+        match property.identifier {
+            PropertyIdentifier::SessionExpiryInterval => {
+                if let DataRepresentation::FourByteInt(v) = property.value {
+                    self.session_expiry_interval = Some(v);
+                }
+            },
+            PropertyIdentifier::AuthenticationMethod => {
+                if let DataRepresentation::UTF8(v) = property.value {
+                    self.auth_method = v.value;
+                }
+            },
+            PropertyIdentifier::AuthenticationData => {
+                if let DataRepresentation::BinaryData(v) = property.value {
+                    self.auth_data = Some(v.clone_inner());
+                }
+            },
+            PropertyIdentifier::RequestProblemInformation => {
+                if let DataRepresentation::Byte(v) = property.value {
+                    self.request_problem_info = v == 1;
+                }
+            },
+            PropertyIdentifier::RequestResponseInformation => {
+                if let DataRepresentation::Byte(v) = property.value {
+                    self.request_response_info = v == 1;
+                }
+            },
+            PropertyIdentifier::ReceiveMaxiumum => {
+                if let DataRepresentation::TwoByteInt(v) = property.value {
+                    self.receive_maximum = Some(v);
+                }
+            },
+            PropertyIdentifier::TopicAliasMaximum => {
+                if let DataRepresentation::TwoByteInt(v) = property.value {
+                    self.topic_alias_max = Some(v);
+                }
+            },
+            PropertyIdentifier::UserProperty => {
+                if let DataRepresentation::UTF8Pair(v) = property.value {
+                    
+                    self.user_properties.insert(v.key.into(), v.value.into());
+                }
+            },
+            PropertyIdentifier::MaximumPacketSize => {
+                if let DataRepresentation::FourByteInt(v) = property.value {
+                    self.max_packet_size = Some(v);
+                }
+            },            
+            _=> return Err(MqttError::ProtocolError(format!("Invalid property identifier [{:?}] for DISCONNECT", property.identifier)))
+        }
+
+        Ok(())
     }
 }
 
@@ -798,7 +847,7 @@ mod tests {
         packet.username = Some("myname".into());
         packet.password = Some(String::from_str("superSecret!").unwrap().as_bytes().to_vec());
         
-        let mut properties = ConnectProperties::new();
+        let mut properties = ConnectProperties::default();
         properties.session_expiry_interval = Some(120);
         properties.receive_maximum = Some(1);
         packet.properties = Some(properties);
@@ -854,6 +903,7 @@ mod tests {
     fn decode_auth() {
         let binary = vec![16,38,0,4,77,81,84,84,5,2,0,60,19,21,0,5,66,65,83,73,67,22,0,8,0,1,2,3,4,5,6,7,0,6,65,85,84,72,73,68];
         let decoded = ConnectPacket::try_from(&binary[..]).unwrap();
+        assert!(decoded.properties.is_some(), "expected properties to be decoded as well!");
         let props = decoded.properties.unwrap();
         
         assert_eq!(Some("BASIC".into()), props.auth_method);

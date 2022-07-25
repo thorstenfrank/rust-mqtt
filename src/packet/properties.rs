@@ -7,6 +7,8 @@ use crate::{
     types::{BinaryData, MqttDataType, UTF8String, VariableByteInteger, UTF8StringPair},
 };
 
+use super::encode_and_append;
+
 /// Numeric IDs.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum PropertyIdentifier {
@@ -84,6 +86,7 @@ pub trait PropertyProcessor {
 
 /// The first byte(s) of the `src` slice *must* be a variable byte integer that determines how many of the following 
 /// bytes represent data that can be parsed into 0 to n properties.
+/// The result will contain the number of bytes that were used during parsing.
 pub fn parse_properties(src: &[u8], processor: &mut impl PropertyProcessor) -> Result<usize, MqttError> {
     let properties_length = VariableByteInteger::try_from(src)?;
     let length: usize = properties_length.value.try_into().unwrap();
@@ -144,6 +147,14 @@ pub fn parse_properties(src: &[u8], processor: &mut impl PropertyProcessor) -> R
     }
 
     Ok(properties_length.encoded_len() + cursor)
+}
+
+pub fn encode_and_append_property(identifier: PropertyIdentifier, value: DataRepresentation, target: &mut Vec<u8>) -> u32 {
+    // yeah, this isn't super safe...
+    let len = value.encoded_len() as u32 + 1;
+    let mut property: Vec<u8> = MqttProperty { identifier, value }.into();
+    target.append(&mut property);
+    len
 }
 
 impl TryFrom<&u8> for PropertyIdentifier {
@@ -241,6 +252,23 @@ impl MqttDataType for DataRepresentation {
     }
 }
 
+impl TryInto<bool> for DataRepresentation {
+    type Error = MqttError;
+
+    fn try_into(self) -> Result<bool, Self::Error> {
+        if let DataRepresentation::Byte(v) = self {
+            match v {
+                0 => return Ok(false),
+                1 => return Ok(true),
+                _=> return Err(MqttError::ProtocolError(format!("illegal value for [shared subscription available]: {}", v))),
+            }
+        }
+
+        Err(MqttError::ProtocolError(format!("only DataRepresentation::Byte can be converted to bool. Is: {:?}", self)))
+
+    }
+}
+
 impl MqttDataType for MqttProperty {
     fn encoded_len(&self) -> usize {
         self.identifier.encoded_len() + self.value.encoded_len()
@@ -268,12 +296,6 @@ impl Into<Vec<u8>> for MqttProperty {
         result
     }
 }
-
-fn encode_and_append<T: Into<Vec<u8>>>(data: T, vec: &mut Vec<u8>) {
-    let mut append_me: Vec<u8> = data.into();
-    vec.append(&mut append_me)
-}
-
 #[cfg(test)]
 mod tests {
 

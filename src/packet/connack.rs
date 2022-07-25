@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{types::*, error::MqttError, packet::calculate_and_insert_length};
 
-use super::{MqttControlPacket, PacketType, push_be_u32, push_be_u16};
+use super::{MqttControlPacket, PacketType, push_be_u32, push_be_u16, properties::{PropertyProcessor, MqttProperty, PropertyIdentifier, DataRepresentation, parse_properties}};
 
 const FIRST_BYTE: u8 = 0b00100000;
 /// A `CONNACK` MQTT control packet.
@@ -100,19 +100,10 @@ impl TryFrom<&[u8]> for ConnackPacket {
         let reason_code = ReasonCode::try_from(src[index])?;
         index += 1;
 
-        let props_length = VariableByteInteger::try_from(&src[index..])?;
-        index += props_length.encoded_len();
-
-        let properties = match props_length.value {
-            0 => {
-                println!("properties length is 0, skipping");
-                None
-            },
-            _=> {
-                let index_stop = index + props_length.value as usize;
-                println!("parsing {} bytes of properties now", props_length.value);
-                Some(ConnackProperties::try_from(&src[index..index_stop])?)
-            }
+        let mut props = ConnackProperties::default();
+        let properties = match parse_properties(&src[index..], &mut props)? {
+            0 | 1 => None,
+            _=> Some(props)
         };
         
         Ok(ConnackPacket { session_present, reason_code, properties })
@@ -175,142 +166,92 @@ impl Default for ConnackProperties {
     }
 }
 
-impl TryFrom<&[u8]> for ConnackProperties {
-    type Error = MqttError;
-
-    fn try_from(src: &[u8]) -> Result<Self, Self::Error> {
-        let mut properties = ConnackProperties::default();
-
-        let mut cursor = 0;
-        while cursor < src.len() {
-            let id = src[cursor];
-            cursor += 1;
-
-            match id {
-                17 => {
-                    match src[cursor..cursor + 4].try_into() {
-                        Ok(a) => properties.session_expiry_interval = Some(u32::from_be_bytes(a)),
-                        Err(e) => return Err(MqttError::Message(format!("Error reading property [session expiry interval]: {:?}", e))),
-                    };
-                    cursor += 4; // u32
-                },
-                18 => {
-                    let assigned_client_id = UTF8String::try_from(&src[cursor..])?;
-                    cursor += assigned_client_id.encoded_len();
-                    properties.assigned_client_id = assigned_client_id.value;
-                },
-                19 => {
-                    match src[cursor..cursor + 2].try_into() {
-                        Ok(a) => properties.server_keep_alive = Some(u16::from_be_bytes(a)),
-                        Err(e) => return Err(MqttError::Message(format!("Error reading property [server keep alive]: {:?}", e))),
-                    };
-                    cursor += 2; // u16
-                },
-                21 => {
-                    let auth_method = UTF8String::try_from(&src[..])?;
-                    cursor += auth_method.encoded_len();
-                    properties.auth_method = auth_method.value;
-                },
-                22 => {
-                    let auth_data = BinaryData::try_from(&src[..])?;
-                    cursor += auth_data.encoded_len();
-                    properties.auth_data = Some(auth_data.clone_inner());
-                },
-                26 => {
-                    let response_info = UTF8String::try_from(&src[cursor..])?;
-                    cursor += response_info.encoded_len();
-                    properties.response_info = response_info.value;
-                },
-                28 => {
-                    let server_reference = UTF8String::try_from(&src[cursor..])?;
-                    cursor += server_reference.encoded_len();
-                    properties.server_reference = server_reference.value;
-                },
-                31 => {
-                    let reason_string = UTF8String::try_from(&src[cursor..])?;
-                    cursor += reason_string.encoded_len();
-                    properties.reason_string = reason_string.value;
-                },
-                33 => {
-                    match src[cursor..cursor + 2].try_into() {
-                        Ok(a) => properties.receive_maximum = Some(u16::from_be_bytes(a)),
-                        Err(e) => return Err(MqttError::Message(format!("Error reading property [receive max]: {:?}", e))),
-                    };
-                    
-                    cursor += 2; // u16
-                },
-                34 => {
-                    match src[cursor..cursor + 2].try_into() {
-                        Ok(a) => properties.topic_alias_max = Some(u16::from_be_bytes(a)),
-                        Err(e) => return Err(MqttError::Message(format!("Error reading property [topic alias max]: {:?}", e))),
-                    };
-                    cursor += 2; // u16
-                },
-                36 => {
-                    properties.maximum_qos = Some(QoS::try_from(src[cursor])?);
-                    cursor += 1;
-                },
-                37 => {
-                    let val = src[cursor];
-                    match val {
-                        0 => properties.retain_available = false,
-                        1 => properties.retain_available = true,
-                        _=> return Err(MqttError::ProtocolError(format!("illegal value for [retain available]: {}", val))),
+impl PropertyProcessor for ConnackProperties {
+    fn process(&mut self, property: MqttProperty) -> Result<(), MqttError> {
+        match property.identifier {
+            PropertyIdentifier::SessionExpiryInterval => {
+                if let DataRepresentation::FourByteInt(v) = property.value {
+                    self.session_expiry_interval = Some(v)
+                }
+            },
+            PropertyIdentifier::AssignedClientIdentifier => {
+                if let DataRepresentation::UTF8(v) = property.value {
+                    self.assigned_client_id = v.value
+                }
+            },
+            PropertyIdentifier::ServerKeepAlive => {
+                if let DataRepresentation::TwoByteInt(v) = property.value {
+                    self.server_keep_alive = Some(v)
+                }
+            },
+            PropertyIdentifier::AuthenticationMethod => {
+                if let DataRepresentation::UTF8(v) = property.value {
+                    self.auth_method = v.value
+                }
+            },
+            PropertyIdentifier::AuthenticationData => {
+                if let DataRepresentation::BinaryData(v) = property.value {
+                    self.auth_data = Some(v.clone_inner())
+                }
+            },
+            PropertyIdentifier::ResponseInformation => {
+                if let DataRepresentation::UTF8(v) = property.value {
+                    self.response_info = v.value
+                }
+            },
+            PropertyIdentifier::ServerReference => {
+                if let DataRepresentation::UTF8(v) = property.value {
+                    self.server_reference = v.value
+                }
+            },
+            PropertyIdentifier::ReasonString => {
+                if let DataRepresentation::UTF8(v) = property.value {
+                    self.reason_string = v.value
+                }
+            },
+            PropertyIdentifier::ReceiveMaxiumum => {
+                if let DataRepresentation::TwoByteInt(v) = property.value {
+                    self.receive_maximum = Some(v)
+                }
+            },
+            PropertyIdentifier::TopicAliasMaximum => {
+                if let DataRepresentation::TwoByteInt(v) = property.value {
+                    self.topic_alias_max = Some(v)
+                }
+            },
+            PropertyIdentifier::MaximumQoS => {
+                if let DataRepresentation::Byte(v) = property.value {
+                    self.maximum_qos = Some(QoS::try_from(v)?)
+                }
+            },
+            PropertyIdentifier::RetainAvailable => {
+                self.retain_available = property.value.try_into()?
+            },
+            PropertyIdentifier::UserProperty => {
+                if let DataRepresentation::UTF8Pair(v) = property.value {
+                    if let Some(s) = v.key.value {
+                        self.user_properties.insert(s, v.value.value.unwrap_or(String::new()));
                     }
-                    cursor += 1; // bool / single byte
-                },
-                38 => {
-                    let key = UTF8String::try_from(&src[cursor..])?;
-                    cursor += key.encoded_len();
-                    let val = UTF8String::try_from(&src[cursor..])?;
-                    cursor += val.encoded_len();
-
-                    // only save this property if we have a key with actual data
-                    if let Some(s) = key.value {
-                        properties.user_properties.insert(s, val.value.unwrap_or(String::new()));
-                    } else {
-                        println!("[CONNACK] User Property with empty key found, skipping");
-                    }
-                },
-                39 => {
-                    match src[cursor..cursor + 4].try_into() {
-                        Ok(a) => properties.max_packet_size = Some(u32::from_be_bytes(a)),
-                        Err(e) => return Err(MqttError::Message(format!("Error reading property [max packet size]: {:?}", e))),
-                    };
-                    cursor += 4; // u32
-                },
-                40 => {
-                    let val = src[cursor];
-                    match val {
-                        0 => properties.wildcard_subscription_available = false,
-                        1 => properties.wildcard_subscription_available = true,
-                        _=> return Err(MqttError::ProtocolError(format!("illegal value for [wildcard subscription available]: {}", val))),
-                    }
-                    cursor += 1; // bool / single byte
-                },
-                41 => {
-                    let val = src[cursor];
-                    match val {
-                        0 => properties.subscription_ids_available = false,
-                        1 => properties.subscription_ids_available = true,
-                        _=> return Err(MqttError::ProtocolError(format!("illegal value for [subscription identifiers available]: {}", val))),
-                    }
-                    cursor += 1; // bool / single byte
-                },
-                42 => {
-                    let val = src[cursor];
-                    match val {
-                        0 => properties.shared_subscription_available = false,
-                        1 => properties.shared_subscription_available = true,
-                        _=> return Err(MqttError::ProtocolError(format!("illegal value for [shared subscription available]: {}", val))),
-                    }
-                    cursor += 1; // bool / single byte
-                },
-                _=> return Err(MqttError::Message(format!("Unknown CONNACK property identifier: {}", src[0])))
-            }
+                }
+            },
+            PropertyIdentifier::MaximumPacketSize => {
+                if let DataRepresentation::FourByteInt(v) = property.value {
+                    self.max_packet_size = Some(v)
+                }
+            },
+            PropertyIdentifier::WildcardSubscriptionAvailable => {
+                self.wildcard_subscription_available = property.value.try_into()?
+            },
+            PropertyIdentifier::SubscriptionIdentifierAvailable => {
+                self.subscription_ids_available = property.value.try_into()?
+            },
+            PropertyIdentifier::SharedSubscriptionAvailable => {
+                self.shared_subscription_available = property.value.try_into()?
+            },
+            _=> return Err(MqttError::Message(format!("Unknown CONNACK property identifier: {:?}", property.identifier)))
         }
-    
-        Ok(properties)
+        
+        Ok(())
     }
 }
 

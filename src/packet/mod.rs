@@ -122,15 +122,21 @@ const LENGTH_START_INDEX: usize = 1;
 /// Subtracts 1 from the vec's length (because we're assuming the first byte is the packet type and flags), creates a
 /// [`VariableByteInteger`] from it and then calls [`insert()`].
 fn calculate_and_insert_length(packet: &mut Vec<u8>) {
-    insert(VariableByteInteger { value: (packet.len() - 1) as u32 }, LENGTH_START_INDEX, packet)
+    encode_and_insert(VariableByteInteger { value: (packet.len() - 1) as u32 }, LENGTH_START_INDEX, packet)
 }
 
-/// Encodes the VBI into its binary representation and then inserts those bytes at the specified index.
-fn insert(val: VariableByteInteger, start_index: usize, binary: &mut Vec<u8>) {
+/// Encodes `val` into its binary representation and appends the resulting bytes to `vec`.
+fn encode_and_append<T: Into<Vec<u8>>>(val: T, vec: &mut Vec<u8>) {
+    vec.append(&mut val.into())
+}
+
+/// Encodes `val` into its binary representation and then inserts those bytes at the specified index.
+/// To encode and append at the end of the 
+fn encode_and_insert<T: Into<Vec<u8>>>(val: T, start_index: usize, vec: &mut Vec<u8>) {
     let mut index = start_index;
     let encoded: Vec<u8> = val.into();
     for b in encoded {
-        binary.insert(index, b);
+        vec.insert(index, b);
         index += 1;
     }
 }
