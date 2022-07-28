@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
-use crate::{types::{ReasonCode, VariableByteInteger, MqttDataType, UTF8String, UTF8StringPair}, error::MqttError, packet::properties::{PropertyIdentifier, DataRepresentation}};
+use mqtt_derive::MqttProperties;
+use crate::{types::{ReasonCode, VariableByteInteger, MqttDataType}, error::MqttError};
 
-use super::{MqttControlPacket, PacketType, properties::{PropertyProcessor, MqttProperty}};
+use super::{MqttControlPacket, PacketType, Decodeable, DecodingResult};
 
 /// The first byte with packet identifier and flags is static for DISCONNECT packets
 const FIRST_BYTE: u8 = 0b011100000;
@@ -21,7 +22,7 @@ pub struct DisconnectPacket {
 }
 
 /// Optional properties in the `DISCONNECT` packet variable header.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, MqttProperties)]
 pub struct DisconnectProperties {
 
     pub session_expiry_interval: Option<u32>,
@@ -30,7 +31,7 @@ pub struct DisconnectProperties {
     pub reason_string: Option<String>,
 
     /// Application-specific key-value elements.
-    pub user_properties: HashMap<String, String>,
+    pub user_property: HashMap<String, String>,
 
     ///
     pub server_reference: Option<String>,
@@ -68,9 +69,10 @@ impl TryFrom<&[u8]> for DisconnectPacket {
 
                 let reason_code = ReasonCode::try_from(src[cursor])?;
                 cursor += 1;
-                let mut properties = DisconnectProperties::default();
-                super::properties::parse_properties(&src[cursor..], &mut properties)?;
-                (reason_code, Some(properties))
+
+                let prop_res: DecodingResult<DisconnectProperties> = DisconnectProperties::decode(&src[cursor..])?;
+
+                (reason_code, prop_res.value())
             }
         };
         
@@ -86,43 +88,11 @@ impl Into<Vec<u8>> for DisconnectPacket {
         
         packet.push(self.reason_code.into());
 
-        let property_length = match self.properties {
-            None => {
-                println!("No properties, skipping");
-                0
-            },
-            Some(props) => {
-                let mut length = 0;
-                if let Some(v) = props.session_expiry_interval {
-                    length += super::properties::encode_and_append_property(
-                        PropertyIdentifier::SessionExpiryInterval, 
-                        DataRepresentation::FourByteInt(v), 
-                        &mut packet);
-                }
-                if let Some(v) = props.reason_string {
-                    length += super::properties::encode_and_append_property(
-                        PropertyIdentifier::ReasonString, 
-                        DataRepresentation::UTF8(UTF8String::from(v)), 
-                        &mut packet);
-                }
-                if let Some(v) = props.server_reference {
-                    length += super::properties::encode_and_append_property(
-                        PropertyIdentifier::ServerReference, 
-                        DataRepresentation::UTF8(UTF8String::from(v)), 
-                        &mut packet);
-                }
-                for (k, v) in props.user_properties {
-                    length += super::properties::encode_and_append_property(
-                        PropertyIdentifier::UserProperty, 
-                        DataRepresentation::UTF8Pair(UTF8StringPair::new(k, v)), 
-                        &mut packet);
-                }
-                length
-            }
-        };
-
-        // insert property length first
-        super::encode_and_insert(VariableByteInteger::from(property_length), 2, &mut packet);
+        if let Some(props) = self.properties {
+            packet.append(&mut props.into());
+        } else {
+            packet.push(0); // no properties => just add a zero
+        }
 
         // then the "remaining length"
         super::calculate_and_insert_length(&mut packet);
@@ -134,50 +104,6 @@ impl Into<Vec<u8>> for DisconnectPacket {
 impl MqttControlPacket<'_> for DisconnectPacket {
     fn packet_type() -> PacketType {
         PacketType::DISCONNECT
-    }
-}
-
-impl Default for DisconnectProperties {
-    fn default() -> Self {
-        Self { 
-            session_expiry_interval: None, 
-            reason_string: None, 
-            user_properties: HashMap::new(), 
-            server_reference: None 
-        }
-    }
-}
-
-impl PropertyProcessor for DisconnectProperties {
-    fn process(&mut self, property: MqttProperty) -> Result<(), MqttError> {
-        match property.identifier {
-
-            PropertyIdentifier::SessionExpiryInterval => {
-                if let DataRepresentation::FourByteInt(v) = property.value {
-                    self.session_expiry_interval = Some(v)
-                }
-            },
-            PropertyIdentifier::ReasonString => {
-                if let DataRepresentation::UTF8(v) = property.value {
-                    self.reason_string = v.value
-                }
-            },
-            PropertyIdentifier::UserProperty => {
-                if let DataRepresentation::UTF8Pair(v) = property.value {
-                    if let Some(s) = v.key.value {
-                        self.user_properties.insert(s, v.value.value.unwrap_or(String::new()));
-                    }
-                }
-            },
-            PropertyIdentifier::ServerReference => {
-                if let DataRepresentation::UTF8(s) = property.value {
-                    self.server_reference = s.value
-                }
-            },
-            _=> return Err(MqttError::ProtocolError(format!("Invalid property identifier [{:?}] for DISCONNECT", property.identifier)))
-        }
-
-        Ok(())
     }
 }
 
@@ -265,6 +191,29 @@ mod tests {
         let res = DisconnectPacket::try_from(&bin[..]);
         assert!(res.is_err(), "expected a MalformedPacket error");
         assert_eq!(Some(MqttError::MalformedPacket(format!("Invalid packet identifier for DISCONNECT: 00100000"))), res.err());
+        
+    }
+
+    #[test]
+    fn disconnect_properties_default() {
+        let packet = DisconnectProperties::default();
+
+        assert!(packet.reason_string.is_none());
+        assert!(packet.server_reference.is_none());
+        assert!(packet.session_expiry_interval.is_none());
+        assert!(packet.user_property.is_empty());
+    }
+
+    #[test]
+    fn encode_properties() {
+        let mut props = DisconnectProperties::default();
+        props.user_property.insert("wuppdi".to_string(), "heppes".to_string());
+        props.session_expiry_interval = Some(120);
+        props.reason_string = Some(String::from("Because you are a test"));
+
+        let vec: Vec<u8> = props.into();
+        assert!(!vec.is_empty());
+        assert_eq!(48, vec.len());
         
     }
 }

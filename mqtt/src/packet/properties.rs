@@ -29,10 +29,10 @@ pub enum PropertyIdentifier {
     ResponseInformation = 26,
     ServerReference = 28,
     ReasonString = 31,
-    ReceiveMaxiumum = 33,
+    ReceiveMaximum = 33,
     TopicAliasMaximum = 34,
     TopicAlias = 35,
-    MaximumQoS = 36,
+    MaximumQos = 36,
     RetainAvailable = 37,
     UserProperty = 38,
     MaximumPacketSize = 39,
@@ -77,17 +77,15 @@ pub enum DataRepresentation {
     BinaryData(BinaryData),
 }
 
-/// Used as a callback receiver in [parse_properties].
-pub trait PropertyProcessor {
-
-    /// This function gets called for each property that has been parsed out of a binary source.
-    fn process(&mut self, property: MqttProperty) -> Result<(), MqttError>;
-}
-
+/// Parses the supplied byte slice and calls the supplied callback function for each parsed [`MqttProperty`].
 /// The first byte(s) of the `src` slice *must* be a variable byte integer that determines how many of the following 
 /// bytes represent data that can be parsed into 0 to n properties.
-/// The result will contain the number of bytes that were used during parsing.
-pub fn parse_properties(src: &[u8], processor: &mut impl PropertyProcessor) -> Result<usize, MqttError> {
+/// The result will contain the number of bytes that were used during parsing. If parsing was successful, then the min
+/// length read will be `1` - the byte to represent the length of `0` properties.
+pub fn parse_properties<F>(src: &[u8], mut f: F) -> Result<usize, MqttError> 
+where
+    F: FnMut(MqttProperty) -> Result<(), MqttError>
+{
     let properties_length = VariableByteInteger::try_from(src)?;
     let length: usize = properties_length.value.try_into().unwrap();
 
@@ -102,7 +100,7 @@ pub fn parse_properties(src: &[u8], processor: &mut impl PropertyProcessor) -> R
             PropertyIdentifier::PayloadFormatIndicator | 
             PropertyIdentifier::RequestProblemInformation | 
             PropertyIdentifier::RequestResponseInformation | 
-            PropertyIdentifier::MaximumQoS | 
+            PropertyIdentifier::MaximumQos | 
             PropertyIdentifier::RetainAvailable | 
             PropertyIdentifier::WildcardSubscriptionAvailable |
             PropertyIdentifier::SubscriptionIdentifierAvailable |
@@ -110,7 +108,7 @@ pub fn parse_properties(src: &[u8], processor: &mut impl PropertyProcessor) -> R
                 DataRepresentation::Byte(remain[cursor])
             },
             PropertyIdentifier::ServerKeepAlive |
-            PropertyIdentifier::ReceiveMaxiumum |
+            PropertyIdentifier::ReceiveMaximum |
             PropertyIdentifier::TopicAliasMaximum |
             PropertyIdentifier::TopicAlias => {
                 DataRepresentation::decode_as_u16(&remain[cursor..])?
@@ -143,7 +141,7 @@ pub fn parse_properties(src: &[u8], processor: &mut impl PropertyProcessor) -> R
         };
 
         cursor += value.encoded_len();
-        processor.process(MqttProperty { identifier, value })?;
+        f(MqttProperty { identifier, value })?;
     }
 
     Ok(properties_length.encoded_len() + cursor)
@@ -178,10 +176,10 @@ impl TryFrom<&u8> for PropertyIdentifier {
             26 => Self::ResponseInformation,
             28 => Self::ServerReference,
             31 => Self::ReasonString,
-            33 => Self::ReceiveMaxiumum,
+            33 => Self::ReceiveMaximum,
             34 => Self::TopicAliasMaximum,
             35 => Self::TopicAlias,
-            36 => Self::MaximumQoS,
+            36 => Self::MaximumQos,
             37 => Self::RetainAvailable,
             38 => Self::UserProperty,
             39 => Self::MaximumPacketSize,

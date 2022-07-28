@@ -102,6 +102,35 @@ pub trait MqttControlPacket<'a>: Into<Vec<u8>> + TryFrom<&'a [u8]> {
 
 }
 
+/// Contains an optional decoding result along with the number of bytes "used" during decoding, even if the result
+/// is `None`.
+pub struct DecodingResult<T> {
+    bytes_read: usize,
+    value: Option<T>,
+}
+
+impl <T>DecodingResult<T> {
+
+    pub fn bytes_read(&self) -> usize {
+        self.bytes_read
+    }
+
+    pub fn value(self) -> Option<T> {
+        self.value
+    }
+}
+
+/// Essentially an extended version of `TryFrom<&[u8]>` that allows returning an "empty" result while still giving 
+/// the caller information about how many bytes were actually used during decoding.
+/// This is relevant especially for decoding elements that always have some footprint in the binary packet, such as
+/// properties where the very least is a single byte representing length `0`.
+pub trait Decodeable: Sized {
+
+    /// Does what it says. May or may not return an actual value.
+    fn decode(src: &[u8]) -> Result<DecodingResult<Self>, crate::error::MqttError>;
+    
+}
+
 /// Converts `val` into two Big-Endian bytes and appends them to `vec`.
 fn push_be_u16(val: u16, vec: &mut Vec<u8>) {
     for b in val.to_be_bytes() {

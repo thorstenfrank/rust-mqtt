@@ -3,9 +3,11 @@
 
 use std::collections::HashMap;
 
+use mqtt_derive::MqttProperties;
+
 use crate::{error::MqttError, types::{QoS, BinaryData, UTF8String, VariableByteInteger, MqttDataType}};
 
-use super::{MqttControlPacket, PacketType, push_be_u32, push_be_u16, properties::{PropertyProcessor, MqttProperty, parse_properties, PropertyIdentifier, DataRepresentation}};
+use super::{MqttControlPacket, PacketType, Decodeable, DecodingResult};
 
 /// 23 characters. The spec says longer client IDs _may_ be used, depending on the server, but servers are not
 /// required to, so we'll just cap it there for now.
@@ -81,7 +83,7 @@ pub struct ConnectPacket {
 }
 
 /// Optional property values for the `CONNECT` packet.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, MqttProperties)]
 pub struct ConnectProperties {
     /// How long a previously established session may be picked up after connection loss in seconds.
     /// Defaults to '0'.
@@ -93,28 +95,28 @@ pub struct ConnectProperties {
     /// Number of bytes per message, representing the maximum a client is willing to accept.
     /// Servers that support this option will discard any messages larger than this value!
     /// Defaults to undefined, meaning no limits on packet size.
-    pub max_packet_size: Option<u32>,
+    pub maximum_packet_size: Option<u32>,
 
     /// TODO we don't support topic aliases yet :(
-    pub topic_alias_max: Option<u16>,
+    pub topic_alias_maximum: Option<u16>,
 
     /// If set to `true`, the server _may_ include additional information in the [CONNACK response](super::ConnackPacket).
     /// Defaults to `false`.
-    pub request_response_info: bool,
+    pub request_response_information: Option<bool>,
 
     /// If set to `true`, the server _may_ include additional information in any subsequent messages. This includes 
     /// the `reason string` and `user properties`.
     /// Defaults to `false`.    
-    pub request_problem_info: bool,
+    pub request_problem_information: Option<bool>,
 
     /// Application-specific key-value elements.
-    pub user_properties: HashMap<String, String>,
+    pub user_property: HashMap<String, String>,
 
     /// Application-specific auth method definition.
-    pub auth_method: Option<String>,
+    pub authentication_method: Option<String>,
 
     /// Application-specific auth data.
-    pub auth_data: Option<Vec<u8>>,
+    pub authentication_data: Option<Vec<u8>>,
 }
 
 /// An MQTT message (including properties) that is published by the broker in case it "loses" connection to the client.
@@ -127,17 +129,30 @@ pub struct LastWill {
     /// Whether or not the server should retain the will message after publishing it.
     pub retain: bool,
 
+    pub properties: Option<WillProperties>,
+
+    /// Name of the topic to publish this will message to.
+    pub will_topic: String,
+
+    /// The actual will message, in an application-specific format.
+    /// Also see [Self::payload_format_utf8] and [Self::content_type].
+    pub will_payload: Vec<u8>,
+}
+
+#[derive(Debug, PartialEq, MqttProperties)]
+pub struct WillProperties {
+    
     /// The grace period (in seconds) after the server has determined it has lost connection to the client before it 
     /// publishes the will message.
     /// This allows clients to reconnect after having "missed" the keep alive interval.
-    pub will_delay: Option<u32>,
+    pub will_delay_interval: Option<u32>,
 
     /// Whether the format of the payload is a UTF-8 compliant string or just a bunch of bytes.
     /// Defaults to `false` (bunch of bytes). Servers _may_ validate that the payload is actually well-formed UTF-8 if
-    /// this value is `true`.
-    pub payload_format_utf8: bool,
+    /// this value is `true`.    
+    pub payload_format_indicator: Option<bool>,
 
-    /// The lifetime of the will message in seconds.
+    /// The lifetime of the will message in seconds.    
     pub message_expiry_interval: Option<u32>,
 
     /// Application-specific content type definition of the payload. Note that this has nothing to do with [payload_format_utf8](Self::payload_format_utf8).
@@ -149,15 +164,8 @@ pub struct LastWill {
     /// Application-specific data.
     pub correlation_data: Option<Vec<u8>>,
 
-    /// Generic key-value properties, entirely application-specific.
-    pub user_properties: HashMap<String, String>,
-
     /// Name of the topic to publish this will message to.
-    pub will_topic: String,
-
-    /// The actual will message, in an application-specific format.
-    /// Also see [Self::payload_format_utf8] and [Self::content_type].
-    pub will_payload: Vec<u8>,
+    pub user_property: HashMap<String, String>,
 }
 
 /// This is used internally during encoding and decoding only.
@@ -218,7 +226,7 @@ impl ConnectPacket {
     /// Inserts or updates a `user property`.
     pub fn set_user_property(&mut self, key: String, value: String) {
         let props = self.properties.get_or_insert(ConnectProperties::default());
-        props.user_properties.insert(key, value);
+        props.user_property.insert(key, value);
     }
 }
 
@@ -286,9 +294,11 @@ impl Into<Vec<u8>> for ConnectPacket {
 
         if let Some(will) = self.will {
             // FIXME include will properties, for now we're just setting them to '0' length
-            packet.push(0);
-            
-            
+            match will.properties {
+                Some(props) => packet.append(&mut props.into()),
+                None => packet.push(0),
+            }
+
             packet.append(&mut UTF8String::from(will.will_topic).into());
             // FIXME just letting this panic isn't really elegant
             let payload = BinaryData::new(will.will_payload).unwrap();
@@ -360,10 +370,9 @@ impl TryFrom<&[u8]> for ConnectPacket {
 
         // Properties
         cursor = cursor_stop;
-        
-        let mut properties = ConnectProperties::default();
-        cursor += parse_properties(&value[cursor..], &mut properties)?;
-        packet.properties = Some(properties);
+        let prop_res: DecodingResult<ConnectProperties> = ConnectProperties::decode(&value[cursor..])?;
+        cursor += prop_res.bytes_read();
+        packet.properties = prop_res.value();
 
         // PAYLOAD
         // The Payload of the CONNECT packet contains one or more length-prefixed fields, whose presence is determined 
@@ -383,12 +392,8 @@ impl TryFrom<&[u8]> for ConnectPacket {
         
         if flags.will_flag {
             // Will Properties
-            let will_props_len = VariableByteInteger::try_from(&value[cursor..])?;
-            cursor += will_props_len.encoded_len();
-
-            // we are skipping properties for now
-            // FIXME implement will property parsing
-            cursor += will_props_len.value as usize;
+            let will_props_res: DecodingResult<WillProperties> = WillProperties::decode(&value[cursor..])?;
+            cursor += will_props_res.bytes_read();
 
             // Will Topic
             let will_topic = UTF8String::try_from(&value[cursor..])?;
@@ -401,15 +406,10 @@ impl TryFrom<&[u8]> for ConnectPacket {
             let will = LastWill { 
                 qos: flags.will_qos.unwrap_or(QoS::AtLeastOnce),
                 retain: flags.will_retain,
-                will_delay: None, 
-                payload_format_utf8: false, 
-                message_expiry_interval: None, 
-                content_type: None, 
-                response_topic: None, 
-                correlation_data: None, 
-                user_properties: HashMap::new(), 
+                properties: will_props_res.value(),
                 will_topic: will_topic.into(), 
-                will_payload: will_payload.clone_inner() };
+                will_payload: will_payload.clone_inner(),
+            };
             packet.will = Some(will);
         }
 
@@ -437,169 +437,13 @@ impl TryFrom<&[u8]> for ConnectPacket {
     }
 }
 
-impl Default for ConnectProperties {
-    fn default() -> Self {
-        Self { 
-            session_expiry_interval: None, 
-            receive_maximum: None, 
-            max_packet_size: None, 
-            topic_alias_max: None, 
-            request_response_info: false, 
-            request_problem_info: false, 
-            user_properties: HashMap::new(), 
-            auth_method: None,
-            auth_data: None, 
-        }
-    }
-}
-
-// FIXME delete this once the property processor inpl is finished
-impl TryFrom<&[u8]> for ConnectProperties {
-    type Error = MqttError;
-
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        let mut result = ConnectProperties::default();
-        
-        let mut cursor: usize = 0;
-        while cursor < value.len() {
-            cursor += parse_property(&value[cursor..], &mut result)?;
-        }
-
-        Ok(result)
-    }
-}
-
-impl PropertyProcessor for ConnectProperties {
-    fn process(&mut self, property: MqttProperty) -> Result<(), MqttError> {
-        match property.identifier {
-            PropertyIdentifier::SessionExpiryInterval => {
-                if let DataRepresentation::FourByteInt(v) = property.value {
-                    self.session_expiry_interval = Some(v);
-                }
-            },
-            PropertyIdentifier::AuthenticationMethod => {
-                if let DataRepresentation::UTF8(v) = property.value {
-                    self.auth_method = v.value;
-                }
-            },
-            PropertyIdentifier::AuthenticationData => {
-                if let DataRepresentation::BinaryData(v) = property.value {
-                    self.auth_data = Some(v.clone_inner());
-                }
-            },
-            PropertyIdentifier::RequestProblemInformation => {
-                if let DataRepresentation::Byte(v) = property.value {
-                    self.request_problem_info = v == 1;
-                }
-            },
-            PropertyIdentifier::RequestResponseInformation => {
-                if let DataRepresentation::Byte(v) = property.value {
-                    self.request_response_info = v == 1;
-                }
-            },
-            PropertyIdentifier::ReceiveMaxiumum => {
-                if let DataRepresentation::TwoByteInt(v) = property.value {
-                    self.receive_maximum = Some(v);
-                }
-            },
-            PropertyIdentifier::TopicAliasMaximum => {
-                if let DataRepresentation::TwoByteInt(v) = property.value {
-                    self.topic_alias_max = Some(v);
-                }
-            },
-            PropertyIdentifier::UserProperty => {
-                if let DataRepresentation::UTF8Pair(v) = property.value {
-                    
-                    self.user_properties.insert(v.key.into(), v.value.into());
-                }
-            },
-            PropertyIdentifier::MaximumPacketSize => {
-                if let DataRepresentation::FourByteInt(v) = property.value {
-                    self.max_packet_size = Some(v);
-                }
-            },            
-            _=> return Err(MqttError::ProtocolError(format!("Invalid property identifier [{:?}] for DISCONNECT", property.identifier)))
-        }
-
-        Ok(())
-    }
-}
-
-impl Into<Vec<u8>> for ConnectProperties {
-    fn into(self) -> Vec<u8> {
-        let mut result = Vec::new();
-        
-        if let Some(val) = self.session_expiry_interval {
-            result.push(17);
-            push_be_u32(val, &mut result);
-        }
-
-        if let Some(val) = self.receive_maximum {
-            result.push(33);
-            push_be_u16(val, &mut result);
-        }
-
-        if let Some(val) = self.max_packet_size {
-            result.push(39);
-            push_be_u32(val, &mut result);
-        }
-
-        if let Some(val) = self.topic_alias_max {
-            result.push(34);
-            push_be_u16(val, &mut result)
-        }
-
-        if self.request_response_info {
-            result.push(25);
-            result.push(1);
-        }
-
-        if self.request_problem_info {
-            result.push(23);
-            result.push(1);
-        }
-
-        for (k, v) in self.user_properties {
-            result.push(38);
-            result.append(&mut k.into());
-            result.append(&mut v.into());
-        }
-
-        if let Some(val) = self.auth_method {
-            result.push(21);
-            result.append(&mut val.into());
-        }
-
-        if let Some(mut val) = self.auth_data {
-            result.push(22);
-            result.append(&mut val);
-        }
-
-        // and finally insert the length at the front
-        let length: Vec<u8> = VariableByteInteger{value: result.len() as u32}.into();
-        let mut index = 0;
-        for b in length {
-            result.insert(index, b);
-            index += 1;
-        }
-
-        result
-    }
-}
-
 impl LastWill {
 
     pub fn new(topic: String, payload: &[u8]) -> Result<Self, MqttError> {
         Ok(LastWill { 
             qos: QoS::AtLeastOnce, 
             retain: false,
-            will_delay: None,
-            payload_format_utf8: false, 
-            message_expiry_interval: None, 
-            content_type: None, 
-            response_topic: None, 
-            correlation_data: None, 
-            user_properties: HashMap::new(), 
+            properties: None,
             will_topic: topic, 
             will_payload: payload.to_vec() })
     }
@@ -728,78 +572,7 @@ fn validate_client_id(client_id: &String) -> Result<(), MqttError> {
     Ok(())
 }
 
-/// TODO clean this up, this is ugly AF. IDs and data types of properties are finite, so we should be able to solve this a little more generically.
-fn parse_property(src: &[u8], properties: &mut ConnectProperties) -> Result<usize, MqttError> {
-    let mut bytes_used = 1; // we're always reading the ID field;
-    let (identifier, remain) = src.split_at(1);
-    match identifier[0] {
-        17 => {
-            match remain[..4].try_into() {
-                Ok(a) => properties.session_expiry_interval = Some(u32::from_be_bytes(a)),
-                Err(e) => return Err(MqttError::Message(format!("Error reading property [session expiry interval]: {:?}", e))),
-            };
-            bytes_used += 4; // u32
-        },
-        21 => {
-            let auth_method = UTF8String::try_from(remain)?;
-            bytes_used += auth_method.encoded_len();
-            properties.auth_method = Some(auth_method.into());
-        },
-        22 => {
-            let auth_data = BinaryData::try_from(remain)?;
-            bytes_used += auth_data.encoded_len();
-            properties.auth_data = Some(auth_data.clone_inner());
-        },
-        23 => {
-            match remain[0] {
-                0 => properties.request_problem_info = false,
-                1 => properties.request_problem_info = true,
-                _=> return Err(MqttError::ProtocolError(format!("illegal value for [request problem info]: {}", remain[0]))),
-            }
-            bytes_used += 1; // bool / single byte
-        },
-        25 => {
-            match remain[0] {
-                0 => properties.request_response_info = false,
-                1 => properties.request_response_info = true,
-                _=> return Err(MqttError::ProtocolError(format!("illegal value for [request response info]: {}", remain[0]))),
-            }
-            bytes_used += 1; // bool / single byte
-        },
-        33 => {
-            match remain[..2].try_into() {
-                Ok(a) => properties.receive_maximum = Some(u16::from_be_bytes(a)),
-                Err(e) => return Err(MqttError::Message(format!("Error reading property [receive max]: {:?}", e))),
-            };
-            
-            bytes_used += 2; // u16
-        },
-        34 => {
-            match remain[..2].try_into() {
-                Ok(a) => properties.topic_alias_max = Some(u16::from_be_bytes(a)),
-                Err(e) => return Err(MqttError::Message(format!("Error reading property [topic alias max]: {:?}", e))),
-            };
-            bytes_used += 2; // u16
-        },
-        38 => {
-            let key = UTF8String::try_from(remain)?;
-            bytes_used += key.encoded_len();
-            let val = UTF8String::try_from(&remain[key.encoded_len()..])?;
-            bytes_used += val.encoded_len();
-            properties.user_properties.insert(key.into(), val.into());
-        },
-        39 => {
-            match remain[..4].try_into() {
-                Ok(a) => properties.max_packet_size = Some(u32::from_be_bytes(a)),
-                Err(e) => return Err(MqttError::Message(format!("Error reading property [max packet size]: {:?}", e))),
-            };
-            bytes_used += 4; // u32
-        },
-        _=> return Err(MqttError::Message(format!("Unknown CONNECT property identifier: {}", src[0])))
-    }
-    Ok(bytes_used)
-}
-
+/// TODO: add test(s) for LastWill with properties
 #[cfg(test)]
 mod tests {
 
@@ -883,15 +656,15 @@ mod tests {
         assert!(decoded.properties.is_some(), "expected CONNECT properties to be present");
         let props = decoded.properties.as_ref().unwrap();
         assert_eq!(Some(32_u16), props.receive_maximum);
-        assert_eq!(1, props.user_properties.len());
-        assert_eq!(Some(&String::from_str("sensor").unwrap()), props.user_properties.get("origin".into()));
-        assert!(props.auth_method.is_none());
-        assert!(props.auth_data.is_none());
-        assert!(props.max_packet_size.is_none());
+        assert_eq!(1, props.user_property.len());
+        assert_eq!(Some(&String::from_str("sensor").unwrap()), props.user_property.get("origin".into()));
+        assert!(props.authentication_method.is_none());
+        assert!(props.authentication_data.is_none());
+        assert!(props.maximum_packet_size.is_none());
         assert!(props.session_expiry_interval.is_none());
-        assert!(props.topic_alias_max.is_none());
-        assert_eq!(false, props.request_problem_info);
-        assert_eq!(false, props.request_response_info);
+        assert!(props.topic_alias_maximum.is_none());
+        assert!(props.request_problem_information.is_none());
+        assert!(props.request_response_information.is_none());
 
         // PAYLOAD
         assert!(decoded.will.is_none(), "did not exepct a will");
@@ -906,8 +679,8 @@ mod tests {
         assert!(decoded.properties.is_some(), "expected properties to be decoded as well!");
         let props = decoded.properties.unwrap();
         
-        assert_eq!(Some("BASIC".into()), props.auth_method);
-        assert_eq!(Some(vec![0,1,2,3,4,5,6,7]), props.auth_data);
+        assert_eq!(Some("BASIC".into()), props.authentication_method);
+        assert_eq!(Some(vec![0,1,2,3,4,5,6,7]), props.authentication_data);
     }
 
     #[test]
@@ -976,7 +749,7 @@ mod tests {
         packet.set_user_property("onekey".to_string(), "oneval".to_string());
         packet.set_user_property("twokey".to_string(), "twoval".to_string());
 
-        assert_eq!(2, packet.properties.unwrap().user_properties.len());
+        assert_eq!(2, packet.properties.unwrap().user_property.len());
         // TODO actually assert the contents of the properties map
     }
 

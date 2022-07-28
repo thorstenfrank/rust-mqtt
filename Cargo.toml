@@ -1,14 +1,6 @@
-[package]
-name = "mqtt"
-version = "0.1.0"
-edition = "2021"
+[workspace]
 
-[[bin]]
-name = "client"
-test = false
-
-[[bin]]
-name = "server"
-test = false
-
-[dependencies]
+members = [
+    "mqtt-derive",
+    "mqtt",
+]

@@ -1,7 +1,6 @@
 use std::{net::TcpStream, io::{BufReader, Write, Read}};
 
-use mqtt::{packet::{ConnectPacket, ConnackPacket}};
-
+use mqtt::packet::{ConnectPacket, ConnackPacket};
 
 fn main() -> std::io::Result<()> {
     let mut stream = TcpStream::connect("127.0.0.1:1883")?;
