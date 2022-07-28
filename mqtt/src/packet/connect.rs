@@ -57,14 +57,14 @@ const PROTO_LEVEL: u8 = 5;
 pub struct Connect {
     
     /// Starting with version 5, MQTT allows sending an empty client ID, in which case one will be appointed by the 
-    /// server, which must be used. See [CONNACK](super::ConnackPacket) for details.
+    /// server, which must be used. See [CONNACK](super::Connack) for details.
     pub client_id: Option<String>,
 
     /// FIXME this really should be bounded as an enum or similar
     protocol_level: u8,
 
     /// Number of seconds before the server closes the connection unless the client has sent another packet.
-    /// This value is a request by the client, the [server can override this in the response](super::ConnackPacket).
+    /// This value is a request by the client, the [server can override this in the response](super::Connack).
     pub keep_alive: u16,
 
     /// Whether to start a new session or resume an existing one (if it exists).
@@ -102,7 +102,7 @@ pub struct ConnectProperties {
     /// TODO we don't support topic aliases yet :(
     pub topic_alias_maximum: Option<u16>,
 
-    /// If set to `true`, the server _may_ include additional information in the [CONNACK response](super::ConnackPacket).
+    /// If set to `true`, the server _may_ include additional information in the [CONNACK response](super::Connack).
     /// Defaults to `false`.
     pub request_response_information: Option<bool>,
 
@@ -137,7 +137,7 @@ pub struct LastWill {
     pub will_topic: String,
 
     /// The actual will message, in an application-specific format.
-    /// Also see [Self::payload_format_utf8] and [Self::content_type].
+    /// Also see [WillProperties::payload_format_indicator] and [WillProperties::content_type].
     pub will_payload: Vec<u8>,
 }
 
@@ -157,7 +157,8 @@ pub struct WillProperties {
     /// The lifetime of the will message in seconds.    
     pub message_expiry_interval: Option<u32>,
 
-    /// Application-specific content type definition of the payload. Note that this has nothing to do with [payload_format_utf8](Self::payload_format_utf8).
+    /// Application-specific content type definition of the payload. Note that this has nothing to do with 
+    /// [Self::payload_format_indicator].
     pub content_type: Option<String>,
 
     /// Response topic definiton.
@@ -220,7 +221,7 @@ impl Connect {
     }
 
     /// Convenience for `with_client_id(client_id.to_string())`.
-    /// Same validation rules as wth [ConnectPacket::with_client_id] still apply.
+    /// Same validation rules as wth [Connect::with_client_id] still apply.
     pub fn with_client_id_str(client_id: &str) -> Result<Self, MqttError> {
         Self::with_client_id(client_id.to_string())
     }
