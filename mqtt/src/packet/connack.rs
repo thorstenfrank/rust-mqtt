@@ -9,7 +9,7 @@ use super::{MqttControlPacket, PacketType, Decodeable, DecodingResult};
 const FIRST_BYTE: u8 = 0b00100000;
 /// A `CONNACK` MQTT control packet.
 #[derive(Debug)]
-pub struct ConnackPacket {
+pub struct Connack {
 
     /// Whether this connect/connack exchange resumes an existing session or starts a new one.
     pub session_present: bool,
@@ -81,7 +81,7 @@ pub struct ConnackProperties {
     pub authentication_data: Option<Vec<u8>>,
 }
 
-impl TryFrom<&[u8]> for ConnackPacket {
+impl TryFrom<&[u8]> for Connack {
     
     type Error = MqttError;
 
@@ -104,11 +104,11 @@ impl TryFrom<&[u8]> for ConnackPacket {
 
         let prop_res: DecodingResult<ConnackProperties> = ConnackProperties::decode(&src[index..])?;
 
-        Ok(ConnackPacket { session_present, reason_code, properties: prop_res.value() })
+        Ok(Connack { session_present, reason_code, properties: prop_res.value() })
     }
 }
 
-impl Into<Vec<u8>> for ConnackPacket {
+impl Into<Vec<u8>> for Connack {
     
     fn into(self) -> Vec<u8> {
         let mut packet: Vec<u8> = Vec::new();
@@ -119,8 +119,7 @@ impl Into<Vec<u8>> for ConnackPacket {
         
         match self.properties {
             Some(props) => {
-                let mut vec: Vec<u8> = props.into();
-                packet.append(&mut vec);
+                packet.append(&mut props.into());
             },
             None => {
                 packet.push(0)
@@ -133,7 +132,7 @@ impl Into<Vec<u8>> for ConnackPacket {
     }
 }
 
-impl MqttControlPacket<'_> for ConnackPacket {
+impl MqttControlPacket<'_> for Connack {
     
     fn packet_type() -> PacketType {
         PacketType::CONNACK
@@ -195,7 +194,7 @@ mod tests {
 
     #[test]
     fn encode() {
-        let connack = ConnackPacket { session_present: false, reason_code: ReasonCode::Success, properties: None };
+        let connack = Connack { session_present: false, reason_code: ReasonCode::Success, properties: None };
         let bin: Vec<u8> = connack.into();
         let expected = vec![32, 3, 0, 0, 0];
         assert_eq!(expected, bin);
@@ -206,14 +205,14 @@ mod tests {
         let mut properties = ConnackProperties::default();
         properties.assigned_client_identifier = Some("generated-123456".into());
         properties.server_keep_alive = Some(135);
-        let connack = ConnackPacket { session_present: true, reason_code: ReasonCode::Success, properties: Some(properties) };
+        let connack = Connack { session_present: true, reason_code: ReasonCode::Success, properties: Some(properties) };
         let actual: Vec<u8> = connack.into();
         let expect: Vec<u8> = vec![32, 25, 1, 0, 22, 18, 0, 16, 103, 101, 110, 101, 114, 97, 116, 101, 100, 45, 49, 50, 51, 52, 53, 54, 19, 0, 135];
         assert_eq!(expect, actual);
     }
 
-    fn run_decode(binary: &[u8], session_present: bool, reason_code: ReasonCode, expect_properties: bool) -> Result<ConnackPacket, MqttError> {
-        let connack = ConnackPacket::try_from(binary)?;
+    fn run_decode(binary: &[u8], session_present: bool, reason_code: ReasonCode, expect_properties: bool) -> Result<Connack, MqttError> {
+        let connack = Connack::try_from(binary)?;
 
         assert_eq!(session_present, connack.session_present);
         assert_eq!(reason_code, connack.reason_code);

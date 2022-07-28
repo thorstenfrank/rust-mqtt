@@ -14,10 +14,12 @@ const FIRST_BYTE: u8 = 0b011100000;
 /// 
 /// See [the spec](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901205)
 #[derive(Debug, PartialEq)]
-pub struct DisconnectPacket {
+pub struct Disconnect {
     
+    /// Details about the disconnect.
     pub reason_code: ReasonCode,
 
+    /// MQTT5 optional properties.
     pub properties: Option<DisconnectProperties>,
 }
 
@@ -25,32 +27,35 @@ pub struct DisconnectPacket {
 #[derive(Debug, PartialEq, MqttProperties)]
 pub struct DisconnectProperties {
 
+    /// Sets the expiration for the current session for a potential re-connect.
+    /// Only relevant for client-side disconnects!
     pub session_expiry_interval: Option<u32>,
 
-    /// 
+    /// A human-readable explanation of the disconnect, if applicable.
     pub reason_string: Option<String>,
 
     /// Application-specific key-value elements.
     pub user_property: HashMap<String, String>,
 
-    ///
+    /// This is usually only populated if the `reason code` is `Server Busy` to indicate a potential other server
+    /// to try out.
     pub server_reference: Option<String>,
 }
 
-impl Default for DisconnectPacket {
+impl Default for Disconnect {
     /// Returns a [DisconnectPacket] with [reason code success](crate::types::ReasonCode) and no properties.
     fn default() -> Self {
         Self { reason_code: ReasonCode::Success, properties: None }
     }
 }
 
-impl TryFrom<&[u8]> for DisconnectPacket {
+impl TryFrom<&[u8]> for Disconnect {
     type Error = MqttError;
 
     fn try_from(src: &[u8]) -> Result<Self, Self::Error> {
         let mut cursor = 0;
         if src[cursor] != FIRST_BYTE {
-            return Err(MqttError::invalid_packet_identifier(DisconnectPacket::packet_type(), &src[0]))
+            return Err(MqttError::invalid_packet_identifier(Disconnect::packet_type(), &src[0]))
         }
 
         cursor += 1;
@@ -76,11 +81,11 @@ impl TryFrom<&[u8]> for DisconnectPacket {
             }
         };
         
-        Ok(DisconnectPacket { reason_code, properties})
+        Ok(Disconnect { reason_code, properties})
     }
 }
 
-impl Into<Vec<u8>> for DisconnectPacket {
+impl Into<Vec<u8>> for Disconnect {
     fn into(self) -> Vec<u8> {
         let mut packet: Vec<u8> = Vec::new();
 
@@ -101,7 +106,7 @@ impl Into<Vec<u8>> for DisconnectPacket {
     }
 }
 
-impl MqttControlPacket<'_> for DisconnectPacket {
+impl MqttControlPacket<'_> for Disconnect {
     fn packet_type() -> PacketType {
         PacketType::DISCONNECT
     }
@@ -116,15 +121,15 @@ mod tests {
 
     #[test]
     fn encode_and_decode() {
-        let packet = DisconnectPacket::default();
+        let packet = Disconnect::default();
         let encoded: Vec<u8> = packet.into();
-        let decoded = DisconnectPacket::try_from(encoded.as_slice()).unwrap();
+        let decoded = Disconnect::try_from(encoded.as_slice()).unwrap();
         assert_eq!(ReasonCode::Success, decoded.reason_code);
     }
 
     #[test]
     fn encode() {
-        let disconnect = DisconnectPacket { reason_code: ReasonCode::NotAuthorized, properties: None };
+        let disconnect = Disconnect { reason_code: ReasonCode::NotAuthorized, properties: None };
         let binary: Vec<u8> = disconnect.into();
         let expected: Vec<u8> = vec![FIRST_BYTE, 2, 0x87, 0];
         assert_eq!(expected, binary);
@@ -135,7 +140,7 @@ mod tests {
         let mut properties = DisconnectProperties::default();
         properties.session_expiry_interval = Some(180);
         properties.reason_string = Some("because".into());
-        let disconnect = DisconnectPacket { reason_code: ReasonCode::Success, properties: Some(properties) };
+        let disconnect = Disconnect { reason_code: ReasonCode::Success, properties: Some(properties) };
 
         let encoded: Vec<u8> = disconnect.into();
         let expected: Vec<u8> = vec![FIRST_BYTE, 17, 0, 15, 17, 0, 0, 0, 180, 31, 0, 7, 98, 101, 99, 97, 117, 115, 101];
@@ -146,21 +151,21 @@ mod tests {
     #[test]
     fn decode() {
         let binary: Vec<u8> = vec![FIRST_BYTE, 5, 0, 0, 2, 3, 4]; // just adding a few dummy values after the reason code
-        let disconnect = DisconnectPacket::try_from(&binary[..]).unwrap();
+        let disconnect = Disconnect::try_from(&binary[..]).unwrap();
         assert_eq!(ReasonCode::Success, disconnect.reason_code);
     }
 
     #[test]
     fn decode_implicit_success() {
         let binary: Vec<u8> = vec![FIRST_BYTE, 0];
-        let decoded = DisconnectPacket::try_from(binary.as_slice()).unwrap();
+        let decoded = Disconnect::try_from(binary.as_slice()).unwrap();
         assert_eq!(ReasonCode::Success, decoded.reason_code);
     }
 
     #[test]
     fn decode_reason_code_unspecified_error() {
         let binary: Vec<u8> = vec![224, 2, 128, 0];
-        let disconnect = DisconnectPacket::try_from(&binary[..]).unwrap();
+        let disconnect = Disconnect::try_from(&binary[..]).unwrap();
         assert_eq!(ReasonCode::UnspecifiedError, disconnect.reason_code);
     }
 
@@ -170,14 +175,14 @@ mod tests {
 
         // FIXME: Reason Code 4 (disconnect with will message) is not yet implemented, which is why we're
         // expecting an undefined error for now
-        let disconnect = DisconnectPacket::try_from(&binary[..]);
+        let disconnect = Disconnect::try_from(&binary[..]);
         assert!(disconnect.is_err());
     }
 
     #[test]
     fn decode_with_properties() {
         let binary: Vec<u8> = vec![FIRST_BYTE, 17, 0, 15, 17, 0, 0, 0, 180, 31, 0, 7, 98, 101, 99, 97, 117, 115, 101];
-        let disconnect = DisconnectPacket::try_from(&binary[..]).expect("Unexpected error decoding DisconnectPacket");
+        let disconnect = Disconnect::try_from(&binary[..]).expect("Unexpected error decoding DisconnectPacket");
         
         assert!(disconnect.properties.is_some());
         let properties = disconnect.properties.unwrap();
@@ -188,7 +193,7 @@ mod tests {
     #[test]
     fn wrong_packet_identifier() {
         let bin: Vec<u8> = vec![32, 1, 0];
-        let res = DisconnectPacket::try_from(&bin[..]);
+        let res = Disconnect::try_from(&bin[..]);
         assert!(res.is_err(), "expected a MalformedPacket error");
         assert_eq!(Some(MqttError::MalformedPacket(format!("Invalid packet identifier for DISCONNECT: 00100000"))), res.err());
         

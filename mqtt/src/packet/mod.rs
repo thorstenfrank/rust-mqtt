@@ -20,8 +20,8 @@ use std::fmt::Display;
 use crate::error::MqttError;
 use crate::types::VariableByteInteger;
 
-pub use self::connect::{ConnectPacket, ConnectProperties, LastWill};
-pub use self::connack::{ConnackPacket, ConnackProperties};
+pub use self::connect::{Connect, ConnectProperties, LastWill};
+pub use self::connack::{Connack, ConnackProperties};
 
 /// MQTT control packet types.
 #[derive(Debug, PartialEq, Eq)]

@@ -1,11 +1,11 @@
 use std::{net::TcpStream, io::{BufReader, Write, Read}};
 
-use mqtt::packet::{ConnectPacket, ConnackPacket};
+use mqtt::packet::{Connect, Connack};
 
 fn main() -> std::io::Result<()> {
     let mut stream = TcpStream::connect("127.0.0.1:1883")?;
 
-    let conn = ConnectPacket::with_client_id_str("my-rust-mqtt-client-0").unwrap();
+    let conn = Connect::with_client_id_str("my-rust-mqtt-client-0").unwrap();
     println!("sending CONNECT: {:?}", conn);
 
     let buf: Vec<u8> = conn.into();
@@ -25,7 +25,7 @@ fn main() -> std::io::Result<()> {
         Ok(len) => {
             println!("read {} bytes from server", len);
             print_bin(&buf[..len]);
-            let connack = ConnackPacket::try_from(&buf[..]).unwrap();
+            let connack = Connack::try_from(&buf[..]).unwrap();
             println!("{:?}", connack)
         },
         Err(e) => println!("error receiving CONNACK: {:?}", e), 
