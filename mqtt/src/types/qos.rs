@@ -4,8 +4,11 @@ use crate::error::MqttError;
 /// See [the spec](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901234).
 #[derive(Debug, PartialEq, PartialOrd, Copy, Clone)]
 pub enum QoS {
+    /// 0
     AtMostOnce = 0,
+    /// 1
     AtLeastOnce = 1,
+    /// 2
     ExactlyOnce = 2,
 }
 
