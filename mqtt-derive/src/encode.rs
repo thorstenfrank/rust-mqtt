@@ -98,6 +98,7 @@ fn map_data_types(field: &PropertyFieldMeta) -> (syn::Ident, quote::__private::T
             quote!{ crate::types::UTF8StringPair::new(k, v) }
         ),
         "QoS" => (format_ident!("{}", "Byte"), quote!{ v.into() }),
-        els => panic!("Cannot convert {:?} of type {:?}", field.name, els)
+        "VariableByteInteger" => (format_ident!("{}", "VariByteInt"), quote!{ v }),
+        els => panic!("Cannot create encoding for [{:?}] of type {:?}", field.name, els)
     }
 }

@@ -33,6 +33,7 @@ impl PropertyFieldMeta {
             "Vec" => "BinaryData",
             "HashMap" => "UTF8Pair",
             "QoS" => "Byte",
+            "VariableByteInteger" => "VariByteInt",
             els => panic!("Cannot convert {:?} of type {:?}", self.name, els)
         };
 
