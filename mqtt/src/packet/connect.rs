@@ -5,9 +5,9 @@ use std::collections::HashMap;
 
 use mqtt_derive::MqttProperties;
 
-use crate::{error::MqttError, types::{QoS, BinaryData, UTF8String, VariableByteInteger, MqttDataType}};
+use crate::{error::MqttError, types::{QoS, BinaryData, UTF8String, MqttDataType}};
 
-use super::{MqttControlPacket, PacketType, Decodeable, DecodingResult};
+use super::{MqttControlPacket, PacketType, Decodeable, DecodingResult, remaining_length};
 
 /// 23 characters. The spec says longer client IDs _may_ be used, depending on the server, but servers are not
 /// required to, so we'll just cap it there for now.
@@ -336,20 +336,12 @@ impl TryFrom<&[u8]> for Connect {
         }
 
         cursor += 1;
-        let mut cursor_stop = cursor + 4;
 
-        let remaining_length = VariableByteInteger::try_from(&value[cursor..cursor_stop])?;
-        cursor = cursor + remaining_length.encoded_len();
-
-        let actual_length = (value.len() - cursor) as u32;
-
-        if remaining_length.value > actual_length {
-            return Err(MqttError::MalformedPacket(
-                format!("Message too short, expected {}, but was {} bytes", remaining_length.value, actual_length)))
-        }
+        let remaining_length = remaining_length(&value[cursor..])?;
+        cursor += remaining_length.encoded_len();
 
         // protocol name and level
-        cursor_stop = cursor + 6;
+        let mut cursor_stop = cursor + 6;
         let proto_name = &value[cursor..cursor_stop];
         cursor = cursor_stop;
         let proto_version: u8 = value[cursor];

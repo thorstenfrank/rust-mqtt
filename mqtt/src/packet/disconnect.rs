@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use mqtt_derive::MqttProperties;
-use crate::{types::{ReasonCode, VariableByteInteger, MqttDataType}, error::MqttError};
+use crate::{types::{ReasonCode, MqttDataType}, error::MqttError};
 
-use super::{MqttControlPacket, PacketType, Decodeable, DecodingResult};
+use super::{MqttControlPacket, PacketType, Decodeable, DecodingResult, remaining_length};
 
 /// The first byte with packet identifier and flags is static for DISCONNECT packets
 const FIRST_BYTE: u8 = 0b011100000;
@@ -59,7 +59,7 @@ impl TryFrom<&[u8]> for Disconnect {
         }
 
         cursor += 1;
-        let remaining_length = VariableByteInteger::try_from(&src[cursor..])?;
+        let remaining_length = remaining_length(&src[cursor..])?;
         let remaining_length_value = remaining_length.encoded_len();
 
         // If the remaining length is 0, reason code success is assumed and there are no properties
@@ -67,11 +67,6 @@ impl TryFrom<&[u8]> for Disconnect {
         let (reason_code, properties)  = match remaining_length.value {
             0 => (ReasonCode::Success, None),
             _ => {
-                let actual_length = src.len() - cursor;
-                if remaining_length_value > actual_length {
-                    return Err(MqttError::MalformedPacket(format!("Defined [{}] remaining length longer than actual [{}]", remaining_length_value, actual_length)))
-                }
-
                 let reason_code = ReasonCode::try_from(src[cursor])?;
                 cursor += 1;
 

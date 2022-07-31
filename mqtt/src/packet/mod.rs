@@ -14,14 +14,17 @@ mod connect;
 mod connack;
 mod disconnect;
 mod properties;
+mod publish;
 
 use std::fmt::Display;
 
 use crate::error::MqttError;
-use crate::types::VariableByteInteger;
+use crate::types::{VariableByteInteger, MqttDataType};
 
 pub use self::connect::{Connect, ConnectProperties, LastWill, WillProperties};
 pub use self::connack::{Connack, ConnackProperties};
+pub use self::disconnect::{Disconnect, DisconnectProperties};
+pub use self::publish::{Publish, PublishProperties};
 
 /// MQTT control packet types.
 #[derive(Debug, PartialEq, Eq)]
@@ -131,7 +134,23 @@ pub trait Decodeable: Sized {
     
 }
 
+/// Decodes a [VariableByteInteger](crate::types::VariableByteInteger) from the beginning of the slice and compares
+/// the decoded value against the actual remaining length of the slice. If the remaining slice is shorter than the
+/// specified one, an error is returned.
+fn remaining_length(src: &[u8]) -> Result<VariableByteInteger, MqttError> {
+    let remain_len = VariableByteInteger::try_from(&src[..])?;
+    let actual_len = (src.len() - remain_len.encoded_len()) as u32;
+
+    if remain_len.value > actual_len {
+        return Err(MqttError::MalformedPacket(
+            format!("Message too short, expected {}, but was {} bytes", remain_len.value, actual_len)))
+    }
+
+    Ok(remain_len)
+}
+
 /// Converts `val` into two Big-Endian bytes and appends them to `vec`.
+/// TODO this should be moved somewhere together with all the other general read, parse, push and encode functions
 fn push_be_u16(val: u16, vec: &mut Vec<u8>) {
     for b in val.to_be_bytes() {
         vec.push(b)
@@ -139,6 +158,7 @@ fn push_be_u16(val: u16, vec: &mut Vec<u8>) {
 }
 
 /// Converts `val` into four Big-Endian bytes and appends them to `vec`.
+/// TODO this should be moved somewhere together with all the other general read, parse, push and encode functions
 fn push_be_u32(val: u32, vec: &mut Vec<u8>) {
     for b in val.to_be_bytes() {
         vec.push(b)

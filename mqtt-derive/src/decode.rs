@@ -32,7 +32,8 @@ pub fn generate_decode(
                 let bytes_read = super::properties::parse_properties(src, |prop| {
                     match prop.identifier {
                         #(#decode_fields,)*
-                        _=> return Err(MqttError::Message(format!("Unknown property identifier: [{:?}] for {}", prop.identifier, #namestr)))
+                        _=> return Err(crate::error::MqttError::Message(
+                            format!("Unknown property identifier: [{:?}] for {}", prop.identifier, #namestr)))
                     }
                 })?;
 
@@ -63,6 +64,7 @@ fn assignment(field: &PropertyFieldMeta) -> quote::__private::TokenStream {
             result.#fname.insert(v.key.value.unwrap(), v.value.value.unwrap_or(String::new()));
          },
         "QoS" => quote!{ result.#fname = Some(QoS::try_from(v)?) },
-        els => panic!("Cannot create assignment for {:?} of type {:?}", field.name, els)
+        "VariableByteInteger" => quote!{ result.#fname = Some(v) },
+        els => panic!("Cannot create decoding for {:?} of type {:?}", field.name, els)
     }
 }
