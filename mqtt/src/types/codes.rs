@@ -1,5 +1,7 @@
 use crate::error::MqttError;
 
+use super::MqttDataType;
+
 /// MQTT-3.2.2.2: Connect Reason Codes, a single byte numeric value.
 /// Anything above 0x80 is considered an error. 
 /// See the spec for details.
@@ -57,6 +59,12 @@ impl ReasonCode {
     pub fn is_err(&self) -> bool {
         let num = *self as u8;
         num <= 128
+    }
+}
+
+impl MqttDataType for ReasonCode {
+    fn encoded_len(&self) -> usize {
+        1
     }
 }
 

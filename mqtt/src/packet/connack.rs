@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use mqtt_derive::MqttProperties;
 
-use crate::{types::*, error::MqttError, packet::calculate_and_insert_length};
+use crate::{error::MqttError, types::{MqttDataType, ReasonCode, QoS, VariableByteInteger}};
 
 use super::{MqttControlPacket, PacketType, Decodeable, DecodingResult};
 
@@ -108,16 +108,16 @@ impl TryFrom<&[u8]> for Connack {
     }
 }
 
-impl Into<Vec<u8>> for Connack {
+impl From<Connack> for Vec<u8> {
     
-    fn into(self) -> Vec<u8> {
+    fn from(connack: Connack) -> Self {
         let mut packet: Vec<u8> = Vec::new();
 
         packet.push(FIRST_BYTE);
-        packet.push(self.session_present.into());
-        packet.push(self.reason_code.into());
+        packet.push(connack.session_present.into());
+        packet.push(connack.reason_code.into());
         
-        match self.properties {
+        match connack.properties {
             Some(props) => {
                 packet.append(&mut props.into());
             },
@@ -126,7 +126,7 @@ impl Into<Vec<u8>> for Connack {
             },
         };
 
-        calculate_and_insert_length(&mut packet);
+        super::calculate_and_insert_length(&mut packet);
 
         packet
     }

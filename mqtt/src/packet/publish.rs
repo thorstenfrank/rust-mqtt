@@ -184,13 +184,7 @@ The Topic Name in the PUBLISH packet MUST NOT contain wildcard characters [MQTT-
         // only present in case QoS is > 0
         let packet_identifier = match qos_level {
             QoS::AtMostOnce => None,
-            _=> match src[cursor..cursor + 2].try_into() {
-                Ok(pid) => {
-                    cursor += 2;
-                    Some(u16::from_be_bytes(pid))
-                },
-                Err(e) => return Err(MqttError::Message(format!("Error reading [keep alive]: {:?}", e))),
-            }
+            _=> Some(super::u16_from_be_bytes(&src[cursor..cursor + 2])?),
         };
 
         // properties

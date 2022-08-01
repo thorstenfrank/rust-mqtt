@@ -330,12 +330,10 @@ impl TryFrom<&[u8]> for Connect {
         let mut packet = Connect::default();
         let mut cursor: usize = 0;
 
-        let first_byte = value[cursor];
-        if FIRST_BYTE != first_byte {
-            return Err(MqttError::MalformedPacket(format!("First byte not a CONNECT packet: {:08b}", first_byte)))
+        match value[cursor] {
+            FIRST_BYTE => cursor += 1,
+            els => return Err(MqttError::MalformedPacket(format!("First byte not a CONNECT packet: {:08b}", els)))
         }
-
-        cursor += 1;
 
         let remaining_length = remaining_length(&value[cursor..])?;
         cursor += remaining_length.encoded_len();
@@ -514,28 +512,28 @@ impl TryFrom<&u8> for ConnectFlags {
     }
 }
 
-impl Into<u8> for ConnectFlags {
-    fn into(self) -> u8 {
+impl From<ConnectFlags> for u8 {
+    fn from(flags: ConnectFlags) -> Self {
         let mut result = 0b00000000;
-        if self.clean_start {
-            result |= Self::CLEAN_START_MASK;
+        if flags.clean_start {
+            result |= ConnectFlags::CLEAN_START_MASK;
         }
-        if self.will_flag {
-            result |= Self::WILL_FLAG_MASK;
+        if flags.will_flag {
+            result |= ConnectFlags::WILL_FLAG_MASK;
         }
-        if self.will_retain {
-            result |= Self::WILL_RETAIN_MASK;
+        if flags.will_retain {
+            result |= ConnectFlags::WILL_RETAIN_MASK;
         }
-        if self.username_flag {
-            result |= Self::USERNAME_MASK;
+        if flags.username_flag {
+            result |= ConnectFlags::USERNAME_MASK;
         }
-        if self.password_flag {
-            result |= Self::PASSWORD_MASK;
+        if flags.password_flag {
+            result |= ConnectFlags::PASSWORD_MASK;
         }
 
-        if self.will_qos.is_some() {
-            let qos: u8 = self.will_qos.unwrap().into();
-            result |= qos << Self::WILL_QOS_SHIFT;
+        if flags.will_qos.is_some() {
+            let qos: u8 = flags.will_qos.unwrap().into();
+            result |= qos << ConnectFlags::WILL_QOS_SHIFT;
         }
 
         result

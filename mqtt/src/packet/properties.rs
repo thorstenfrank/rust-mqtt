@@ -7,7 +7,7 @@ use crate::{
     types::{BinaryData, MqttDataType, UTF8String, VariableByteInteger, UTF8StringPair},
 };
 
-use super::encode_and_append;
+use super::{encode_and_append, u16_from_be_bytes, u32_from_be_bytes};
 
 /// Numeric IDs.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -209,30 +209,12 @@ impl DataRepresentation {
 
     /// Returns [`DataRepresentation::TwoByteInt`]
     fn decode_as_u16(src: &[u8]) -> Result<Self, MqttError> {
-        let index = std::mem::size_of::<u16>();
-        
-        if index >= src.len() {
-            return Err(MqttError::Message(format!("Source slice too short for u16!")))
-        }
-
-        let (int_bytes, _) = src.split_at(index);
-        match int_bytes.try_into() {
-            Ok(a) => Ok(Self::TwoByteInt(u16::from_be_bytes(a))),
-            Err(e) => Err(MqttError::Message(format!("Error decoding TwoByteInteger: {:?}", e))),
-        }
+        Ok(Self::TwoByteInt(u16_from_be_bytes(&src)?))
     }
 
     /// Returns [`DataRepresentation::FourByteInt`]
     fn decode_as_u32(src: &[u8]) -> Result<Self, MqttError> {
-        let index = std::mem::size_of::<u32>();
-        if index >= src.len() {
-            return Err(MqttError::Message(format!("Source slice too short for u32!")))
-        }
-        let (int_bytes, _) = src.split_at(index);
-        match int_bytes.try_into() {
-            Ok(a) => Ok(Self::FourByteInt(u32::from_be_bytes(a))),
-            Err(e) => Err(MqttError::Message(format!("Error decoding FourByteInteger: {:?}", e))),
-        }
+        Ok(Self::FourByteInt(u32_from_be_bytes(&src)?))
     }
 }
 

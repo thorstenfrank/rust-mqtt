@@ -14,6 +14,7 @@ mod connect;
 mod connack;
 mod disconnect;
 mod properties;
+mod puback;
 mod publish;
 
 use std::fmt::Display;
@@ -154,6 +155,36 @@ fn remaining_length(src: &[u8]) -> Result<VariableByteInteger, MqttError> {
 fn push_be_u16(val: u16, vec: &mut Vec<u8>) {
     for b in val.to_be_bytes() {
         vec.push(b)
+    }
+}
+
+/// Converts the first two bytes of the slice into a big-endian u16.
+/// returns an error if the slice is shorter than 2 bytes
+fn u16_from_be_bytes(src: &[u8]) -> Result<u16, MqttError> {
+    let index = std::mem::size_of::<u16>();
+    if index >= src.len() {
+        return Err(MqttError::Message(format!("Source slice too short for u16!")))
+    }
+
+    let (int_bytes, _) = src.split_at(index);
+    match int_bytes.try_into() {
+        Ok(a) => Ok(u16::from_be_bytes(a)),
+        Err(e) => Err(MqttError::Message(format!("Error decoding u16: {:?}", e))),
+    }
+}
+
+/// Converts the first four bytes of the slice into a big-endian u32.
+/// returns an error if the slice is shorter than 4 bytes
+fn u32_from_be_bytes(src: &[u8]) -> Result<u32, MqttError> {
+    let index = std::mem::size_of::<u32>();
+    if index >= src.len() {
+        return Err(MqttError::Message(format!("Source slice too short for u16!")))
+    }
+
+    let (int_bytes, _) = src.split_at(index);
+    match int_bytes.try_into() {
+        Ok(a) => Ok(u32::from_be_bytes(a)),
+        Err(e) => Err(MqttError::Message(format!("Error decoding u32: {:?}", e))),
     }
 }
 
