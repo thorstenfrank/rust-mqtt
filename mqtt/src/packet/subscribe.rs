@@ -2,9 +2,8 @@ use std::collections::HashMap;
 
 use mqtt_derive::MqttProperties;
 
-use crate::{types::{QoS, VariableByteInteger, UTF8String, MqttDataType}, error::MqttError, packet::Decodeable};
-
-use super::DecodingResult;
+use crate::{types::{QoS, VariableByteInteger, UTF8String, MqttDataType}, error::MqttError};
+use super::{Decodeable, DecodingResult};
 
 /// A `SUBSCRIBE` packet from a client is the prerequisite to receiving messages through [crate::packet::Publish].
 #[derive(Debug)]

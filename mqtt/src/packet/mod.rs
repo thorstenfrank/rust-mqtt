@@ -28,8 +28,8 @@
 //! - Sender: `PUBREL`
 //! - Reciever: `PUBCOMP`
 
-mod connect;
 mod connack;
+mod connect;
 mod disconnect;
 mod properties;
 mod puback;
@@ -37,6 +37,7 @@ mod pubcomp;
 mod publish;
 mod pubrec;
 mod pubrel;
+mod suback;
 mod subscribe;
 
 use std::fmt::Display;
@@ -44,14 +45,15 @@ use std::fmt::Display;
 use crate::error::MqttError;
 use crate::types::{VariableByteInteger, MqttDataType};
 
-pub use self::connect::{Connect, ConnectProperties, LastWill, WillProperties};
 pub use self::connack::{Connack, ConnackProperties};
+pub use self::connect::{Connect, ConnectProperties, LastWill, WillProperties};
 pub use self::disconnect::{Disconnect, DisconnectProperties};
 pub use self::puback::{Puback, PubackProperties};
 pub use self::pubcomp::{Pubcomp, PubcompProperties};
 pub use self::publish::{Publish, PublishProperties};
 pub use self::pubrec::{Pubrec, PubrecProperties};
 pub use self::pubrel::{Pubrel, PubrelProperties};
+pub use self::suback::{Suback, SubackProperties};
 pub use self::subscribe::{Subscribe, SubscribeProperties};
 
 /// MQTT control packet types.
