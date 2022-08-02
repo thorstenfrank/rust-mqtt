@@ -40,6 +40,7 @@ mod pubrec;
 mod pubrel;
 mod suback;
 mod subscribe;
+mod unsub;
 
 use std::fmt::Display;
 
@@ -57,6 +58,7 @@ pub use self::pubrec::{Pubrec, PubrecProperties};
 pub use self::pubrel::{Pubrel, PubrelProperties};
 pub use self::suback::{Suback, SubackProperties};
 pub use self::subscribe::{Subscribe, SubscribeProperties};
+pub use self::unsub::{Unsubscribe, UnsubscribeProperties};
 
 /// MQTT control packet types.
 #[derive(Debug, PartialEq, Eq)]
