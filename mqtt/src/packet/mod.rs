@@ -31,6 +31,7 @@
 mod connack;
 mod connect;
 mod disconnect;
+mod ping;
 mod properties;
 mod puback;
 mod pubcomp;
@@ -48,6 +49,7 @@ use crate::types::{VariableByteInteger, MqttDataType};
 pub use self::connack::{Connack, ConnackProperties};
 pub use self::connect::{Connect, ConnectProperties, LastWill, WillProperties};
 pub use self::disconnect::{Disconnect, DisconnectProperties};
+pub use self::ping::{Pingreq, Pingresp};
 pub use self::puback::{Puback, PubackProperties};
 pub use self::pubcomp::{Pubcomp, PubcompProperties};
 pub use self::publish::{Publish, PublishProperties};

@@ -8,6 +8,7 @@ use super::MqttDataType;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ReasonCode {
     /// 0x00 (0)
+    /// In the context of a `SUBACK` packet this doubles as `Granted QoS 0`
     Success = 0x00,
     /// 0x01 (1)
     GrantedQoS1 = 0x01,

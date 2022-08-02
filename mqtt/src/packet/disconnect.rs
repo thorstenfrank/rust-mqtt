@@ -43,7 +43,7 @@ pub struct DisconnectProperties {
 }
 
 impl Default for Disconnect {
-    /// Returns a [DisconnectPacket] with [reason code success](crate::types::ReasonCode) and no properties.
+    /// Returns a [`Disconnect`] with [reason code success](crate::types::ReasonCode) and no properties.
     fn default() -> Self {
         Self { reason_code: ReasonCode::Success, properties: None }
     }
