@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use mqtt_derive::MqttProperties;
 
 use crate::{types::{ReasonCode, MqttDataType}, error::MqttError};
-use super::{Decodeable, DecodingResult};
+use super::{Decodeable, DecodingResult, MqttControlPacket};
 
 /// A `SUBACK` packet is sent by the Server to the Client to confirm receipt and processing of a `SUBSCRIBE` packet.
 /// 
@@ -21,6 +21,12 @@ pub struct Suback {
 pub struct SubackProperties {
     reason_string: Option<String>,
     user_property: HashMap<String, String>,
+}
+
+impl MqttControlPacket<'_> for Suback {
+    fn packet_type() -> super::PacketType {
+        super::PacketType::SUBACK
+    }
 }
 
 const FIRST_BYTE: u8 = 0b10010000;

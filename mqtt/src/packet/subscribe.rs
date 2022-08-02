@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use mqtt_derive::MqttProperties;
 
 use crate::{types::{QoS, VariableByteInteger, UTF8String, MqttDataType}, error::MqttError};
-use super::{Decodeable, DecodingResult};
+use super::{Decodeable, DecodingResult, MqttControlPacket};
 
 /// A `SUBSCRIBE` packet from a client is the prerequisite to receiving messages through [crate::packet::Publish].
 #[derive(Debug)]
@@ -41,6 +41,12 @@ pub enum RetainHandling {
     NewSubOnly = 1,
     /// Self-explanatory
     Never = 2,
+}
+
+impl MqttControlPacket<'_> for Subscribe {
+    fn packet_type() -> super::PacketType {
+        super::PacketType::SUBSCRIBE
+    }
 }
 
 /// Packet Type 1000 | Reserved 0000

@@ -4,6 +4,8 @@ use mqtt_derive::MqttProperties;
 
 use crate::{types::{ReasonCode, MqttDataType}, error::MqttError, packet::Decodeable};
 
+use super::MqttControlPacket;
+
 /// `PUBACK` is the response to a `PUBLISH` that was sent with [crate::types::QoS::AtLeastOnce].
 #[derive(Debug)]
 pub struct Puback {
@@ -16,6 +18,12 @@ pub struct Puback {
 pub struct PubackProperties {
     pub reason_string: Option<String>,
     pub user_property: HashMap<String, String>,
+}
+
+impl MqttControlPacket<'_> for Puback {
+    fn packet_type() -> super::PacketType {
+        super::PacketType::PUBACK
+    }
 }
 
 /// Fixed first byte of the header

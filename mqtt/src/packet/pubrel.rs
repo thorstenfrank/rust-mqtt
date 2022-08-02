@@ -4,6 +4,8 @@ use mqtt_derive::MqttProperties;
 
 use crate::{types::{ReasonCode, MqttDataType}, error::MqttError, packet::Decodeable};
 
+use super::MqttControlPacket;
+
 /// `PUBREL` is the response to a [`PUBREC`](crate::packet::Pubrec). 
 /// Applies only to messages published with [crate::types::QoS::ExactlyOnce].
 /// 
@@ -23,6 +25,12 @@ pub struct Pubrel {
 pub struct PubrelProperties {
     pub reason_string: Option<String>,
     pub user_property: HashMap<String, String>,
+}
+
+impl MqttControlPacket<'_> for Pubrel {
+    fn packet_type() -> super::PacketType {
+        super::PacketType::PUBREL
+    }
 }
 
 /// Fixed first byte of the header

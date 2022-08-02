@@ -4,7 +4,7 @@ use mqtt_derive::MqttProperties;
 
 use crate::{types::{QoS, VariableByteInteger, UTF8String, MqttDataType}, error::MqttError};
 
-use super::{remaining_length, Decodeable, DecodingResult};
+use super::{remaining_length, Decodeable, DecodingResult, MqttControlPacket};
 
 /// An MQTT `PUBLISH` packet is used to send a specific message to a topic.
 /// 
@@ -72,6 +72,12 @@ pub struct PublishProperties {
     user_property: HashMap<String, String>,
     subscription_identifier: Option<VariableByteInteger>,
     content_type: Option<String>,
+}
+
+impl MqttControlPacket<'_> for Publish {
+    fn packet_type() -> super::PacketType {
+        super::PacketType::PUBLISH
+    }
 }
 
 impl Publish {

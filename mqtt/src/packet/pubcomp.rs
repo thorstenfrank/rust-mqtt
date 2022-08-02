@@ -4,6 +4,8 @@ use mqtt_derive::MqttProperties;
 
 use crate::{types::{ReasonCode, MqttDataType}, error::MqttError, packet::Decodeable};
 
+use super::MqttControlPacket;
+
 /// `PUBCOMP` is the final message in the flow initiated with `PUBLISH` sent with [crate::types::QoS::ExactlyOnce].
 /// 
 /// The sequence of messages for QoS 2 is as follows:
@@ -26,6 +28,12 @@ pub struct PubcompProperties {
 
 /// Fixed first byte of the header
 const FIRST_BYTE: u8 = 0b01110000;
+
+impl MqttControlPacket<'_> for Pubcomp {
+    fn packet_type() -> super::PacketType {
+        super::PacketType::PUBCOMP
+    }
+}
 
 impl Pubcomp {
 
