@@ -37,6 +37,7 @@ mod pubcomp;
 mod publish;
 mod pubrec;
 mod pubrel;
+mod subscribe;
 
 use std::fmt::Display;
 
@@ -51,6 +52,7 @@ pub use self::pubcomp::{Pubcomp, PubcompProperties};
 pub use self::publish::{Publish, PublishProperties};
 pub use self::pubrec::{Pubrec, PubrecProperties};
 pub use self::pubrel::{Pubrel, PubrelProperties};
+pub use self::subscribe::{Subscribe, SubscribeProperties};
 
 /// MQTT control packet types.
 #[derive(Debug, PartialEq, Eq)]
