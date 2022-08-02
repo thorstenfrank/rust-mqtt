@@ -9,13 +9,34 @@
 //! to use from an API perspective. There is no separation into fixed header, variable header and payload in the way 
 //! the spec makes these distinctions. It is the internal encoding/decoding logic's responsibility to make sure these
 //! are mapped properly.
+//! 
+//! # QoS and Message Flow
+//! 
+//! ## QoS 0 (At most once)
+//! `DUP` must also be 0.
+//! 
+//! - Sender: `PUBLISH`
+//! - Receiver: no response
+//! 
+//! ## QoS 1 (At least once)
+//! - Sender: `PUBLISH`
+//! - Receiver: `PUBACK`
+//! 
+//! ## QoS 2 (Exactly once)
+//! - Sender: `PUBLISH`
+//! - Receiver: `PUBREC`
+//! - Sender: `PUBREL`
+//! - Reciever: `PUBCOMP`
 
 mod connect;
 mod connack;
 mod disconnect;
 mod properties;
 mod puback;
+mod pubcomp;
 mod publish;
+mod pubrec;
+mod pubrel;
 
 use std::fmt::Display;
 
@@ -25,7 +46,11 @@ use crate::types::{VariableByteInteger, MqttDataType};
 pub use self::connect::{Connect, ConnectProperties, LastWill, WillProperties};
 pub use self::connack::{Connack, ConnackProperties};
 pub use self::disconnect::{Disconnect, DisconnectProperties};
+pub use self::puback::{Puback, PubackProperties};
+pub use self::pubcomp::{Pubcomp, PubcompProperties};
 pub use self::publish::{Publish, PublishProperties};
+pub use self::pubrec::{Pubrec, PubrecProperties};
+pub use self::pubrel::{Pubrel, PubrelProperties};
 
 /// MQTT control packet types.
 #[derive(Debug, PartialEq, Eq)]

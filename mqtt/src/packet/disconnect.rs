@@ -167,11 +167,8 @@ mod tests {
     #[test]
     fn decode_reason_code_with_will() {
         let binary: Vec<u8> = vec![224, 2, 4, 0];
-
-        // FIXME: Reason Code 4 (disconnect with will message) is not yet implemented, which is why we're
-        // expecting an undefined error for now
-        let disconnect = Disconnect::try_from(&binary[..]);
-        assert!(disconnect.is_err());
+        let disconnect = Disconnect::try_from(&binary[..]).unwrap();
+        assert_eq!(ReasonCode::DisconnectWithWill, disconnect.reason_code);
     }
 
     #[test]

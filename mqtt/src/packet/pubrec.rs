@@ -4,24 +4,31 @@ use mqtt_derive::MqttProperties;
 
 use crate::{types::{ReasonCode, MqttDataType}, error::MqttError, packet::Decodeable};
 
-/// `PUBACK` is the response to a `PUBLISH` that was sent with [crate::types::QoS::AtLeastOnce].
+/// `PUBREC` is the response to a `PUBLISH` that was sent with [crate::types::QoS::ExactlyOnce].
+/// Must be followed by [`PUBREL`](crate::packet::Pubrel).
+/// 
+/// The sequence of messages for QoS 2 is as follows:
+/// - `PUBLISH` -->
+/// - `PUBREC` <--
+/// - `PUBREL` -->
+/// - `PUBCOMP` <-- 
 #[derive(Debug)]
-pub struct Puback {
+pub struct Pubrec {
     pub packet_identifier: u16,
     pub reason_code: ReasonCode,
-    pub properties: Option<PubackProperties>,
+    pub properties: Option<PubrecProperties>,
 }
 
 #[derive(Debug, MqttProperties)]
-pub struct PubackProperties {
+pub struct PubrecProperties {
     pub reason_string: Option<String>,
     pub user_property: HashMap<String, String>,
 }
 
 /// Fixed first byte of the header
-const FIRST_BYTE: u8 = 0b01000000;
+const FIRST_BYTE: u8 = 0b01010000;
 
-impl Puback {
+impl Pubrec {
 
     pub fn new(packet_identifier: u16, reason_code: ReasonCode) -> Result<Self, MqttError> {
         Self::validate_reason_code(&reason_code)?;
@@ -39,20 +46,20 @@ impl Puback {
             ReasonCode::PacketIdentifierInUse |
             ReasonCode::QuotaExceeded |
             ReasonCode::PayloadFormatInvalid => Ok(()),
-            els => Err(MqttError::ProtocolError(format!("Invalid reason code [{}] for PUBACK", u8::from(*els)))),
+            els => Err(MqttError::ProtocolError(format!("Invalid reason code [{}] for PUBREC", u8::from(*els)))),
         }
     }
 }
 
-impl From<Puback> for Vec<u8> {
-    fn from(puback: Puback) -> Self {
+impl From<Pubrec> for Vec<u8> {
+    fn from(pubrec: Pubrec) -> Self {
         let mut result: Vec<u8> = Vec::new();
 
         result.push(FIRST_BYTE);
-        super::push_be_u16(puback.packet_identifier, &mut result);
-        result.push(puback.reason_code.into());
+        super::push_be_u16(pubrec.packet_identifier, &mut result);
+        result.push(pubrec.reason_code.into());
 
-        match puback.properties {
+        match pubrec.properties {
             Some(props) => result.append(&mut props.into()),
             None => result.push(0),
         }
@@ -63,7 +70,7 @@ impl From<Puback> for Vec<u8> {
     }
 }
 
-impl TryFrom<&[u8]> for Puback {
+impl TryFrom<&[u8]> for Pubrec {
     type Error = MqttError;
 
     fn try_from(src: &[u8]) -> Result<Self, Self::Error> {
@@ -71,7 +78,7 @@ impl TryFrom<&[u8]> for Puback {
 
         match src[cursor] {
             FIRST_BYTE => cursor += 1,
-            els => return Err(MqttError::MalformedPacket(format!("First byte is not a PUBACK one: {:b}", els)))
+            els => return Err(MqttError::MalformedPacket(format!("First byte is not a PUBREC one: {:b}", els)))
         }
 
         let remain_len = super::remaining_length(&src[cursor..])?;
@@ -84,7 +91,7 @@ impl TryFrom<&[u8]> for Puback {
         cursor += reason_code.encoded_len();
         
         let mut result = Self::new(packet_identifier, reason_code)?;
-        result.properties = PubackProperties::decode(&src[cursor..])?.value();
+        result.properties = PubrecProperties::decode(&src[cursor..])?.value();
         
         Ok(result)
     }
@@ -97,12 +104,12 @@ mod tests {
 
     #[test]
     fn encode_and_decode() {
-        let puback = Puback::new(123, ReasonCode::Success).unwrap();
-        let encoded: Vec<u8> = puback.into();
-        
-        assert_eq!(0b01000000, encoded[0]);
+        let pubrec = Pubrec::new(123, ReasonCode::Success).unwrap();
+        let encoded: Vec<u8> = pubrec.into();
 
-        let decoded = Puback::try_from(&encoded[..]).unwrap();
+        assert_eq!(0b01010000, encoded[0]);
+
+        let decoded = Pubrec::try_from(&encoded[..]).unwrap();
         assert_eq!(123_u16, decoded.packet_identifier);
         assert_eq!(0x00_u8, decoded.reason_code.into());
         assert!(decoded.properties.is_none());
@@ -110,14 +117,14 @@ mod tests {
 
     #[test]
     fn encode_and_decode_with_properties() {
-        let mut puback = Puback::new(6397, ReasonCode::UnspecifiedError).unwrap();
-        let mut properties = PubackProperties::default();
+        let mut pubrec = Pubrec::new(6397, ReasonCode::UnspecifiedError).unwrap();
+        let mut properties = PubrecProperties::default();
         properties.reason_string = Some("too lazy at the moment, apologies".into());
         properties.user_property.insert("options".into(), "none, really".into());
-        puback.properties = Some(properties);
+        pubrec.properties = Some(properties);
 
-        let encoded: Vec<u8> = puback.into();
-        let decoded = Puback::try_from(&encoded[..]).unwrap();
+        let encoded: Vec<u8> = pubrec.into();
+        let decoded = Pubrec::try_from(&encoded[..]).unwrap();
         assert_eq!(6397_u16, decoded.packet_identifier);
         assert_eq!(0x80_u8, decoded.reason_code.into());
         assert!(decoded.properties.is_some());
@@ -125,6 +132,6 @@ mod tests {
 
     #[test]
     fn reason_code_validation() {
-        assert!(Puback::new(123, ReasonCode::AdministrativeAction).is_err());
+        assert!(Pubrec::new(123, ReasonCode::AdministrativeAction).is_err());
     }
 }
