@@ -28,6 +28,7 @@
 //! - Sender: `PUBREL`
 //! - Reciever: `PUBCOMP`
 
+mod auth;
 mod connack;
 mod connect;
 mod disconnect;
@@ -48,6 +49,7 @@ use std::fmt::Display;
 use crate::error::MqttError;
 use crate::types::{VariableByteInteger, MqttDataType};
 
+pub use self::auth::{Auth, AuthProperties};
 pub use self::connack::{Connack, ConnackProperties};
 pub use self::connect::{Connect, ConnectProperties, LastWill, WillProperties};
 pub use self::disconnect::{Disconnect, DisconnectProperties};
