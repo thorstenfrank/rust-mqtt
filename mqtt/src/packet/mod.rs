@@ -199,8 +199,8 @@ fn push_be_u16(val: u16, vec: &mut Vec<u8>) {
 /// returns an error if the slice is shorter than 2 bytes
 fn u16_from_be_bytes(src: &[u8]) -> Result<u16, MqttError> {
     let index = std::mem::size_of::<u16>();
-    if index >= src.len() {
-        return Err(MqttError::Message(format!("Source slice too short for u16!")))
+    if index > src.len() {
+        return Err(MqttError::Message(format!("Source slice too short for u16: {}", src.len())))
     }
 
     let (int_bytes, _) = src.split_at(index);
@@ -214,7 +214,7 @@ fn u16_from_be_bytes(src: &[u8]) -> Result<u16, MqttError> {
 /// returns an error if the slice is shorter than 4 bytes
 fn u32_from_be_bytes(src: &[u8]) -> Result<u32, MqttError> {
     let index = std::mem::size_of::<u32>();
-    if index >= src.len() {
+    if index > src.len() {
         return Err(MqttError::Message(format!("Source slice too short for u16!")))
     }
 

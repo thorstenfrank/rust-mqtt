@@ -58,11 +58,18 @@ impl From<Puback> for Vec<u8> {
 
         result.push(FIRST_BYTE);
         super::push_be_u16(puback.packet_identifier, &mut result);
-        result.push(puback.reason_code.into());
 
-        match puback.properties {
-            Some(props) => result.append(&mut props.into()),
-            None => result.push(0),
+        // only include this info if necessary.
+        //
+        // "Byte 3 in the Variable Header is the PUBACK Reason Code. If the Remaining Length is 2, then there is
+        // no Reason Code and the value of 0x00 (Success) is used."
+        if ReasonCode::Success != puback.reason_code || puback.properties.is_some() {
+            result.push(puback.reason_code.into());
+
+            match puback.properties {
+                Some(props) => result.append(&mut props.into()),
+                None => result.push(0),
+            }
         }
 
         super::calculate_and_insert_length(&mut result);
@@ -88,11 +95,21 @@ impl TryFrom<&[u8]> for Puback {
         let packet_identifier = super::u16_from_be_bytes(&src[cursor..])?;
         cursor += packet_identifier.encoded_len();
 
-        let reason_code = ReasonCode::try_from(src[cursor])?;
-        cursor += reason_code.encoded_len();
-        
+        let (reason_code, properties) = match remain_len.value {
+            2 => {
+                (ReasonCode::Success, None)
+            },
+            _=> {
+                let reason_code = ReasonCode::try_from(src[cursor])?;
+                cursor += reason_code.encoded_len();
+
+                (reason_code, PubackProperties::decode(&src[cursor..])?.value())
+            }
+        };
+
+        // includes validation of reason codes
         let mut result = Self::new(packet_identifier, reason_code)?;
-        result.properties = PubackProperties::decode(&src[cursor..])?.value();
+        result.properties = properties;
         
         Ok(result)
     }
@@ -107,8 +124,7 @@ mod tests {
     fn encode_and_decode() {
         let puback = Puback::new(123, ReasonCode::Success).unwrap();
         let encoded: Vec<u8> = puback.into();
-        
-        assert_eq!(0b01000000, encoded[0]);
+        assert_eq!(encoded, vec![64, 2, 0, 123]);
 
         let decoded = Puback::try_from(&encoded[..]).unwrap();
         assert_eq!(123_u16, decoded.packet_identifier);

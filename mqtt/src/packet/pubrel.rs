@@ -58,11 +58,14 @@ impl From<Pubrel> for Vec<u8> {
 
         result.push(FIRST_BYTE);
         super::push_be_u16(pubrel.packet_identifier, &mut result);
-        result.push(pubrel.reason_code.into());
 
-        match pubrel.properties {
-            Some(props) => result.append(&mut props.into()),
-            None => result.push(0),
+        if pubrel.reason_code != ReasonCode::Success || pubrel.properties.is_some() {
+            result.push(pubrel.reason_code.into());
+
+            match pubrel.properties {
+                Some(props) => result.append(&mut props.into()),
+                None => result.push(0),
+            }
         }
 
         super::calculate_and_insert_length(&mut result);
@@ -88,11 +91,18 @@ impl TryFrom<&[u8]> for Pubrel {
         let packet_identifier = super::u16_from_be_bytes(&src[cursor..])?;
         cursor += packet_identifier.encoded_len();
 
-        let reason_code = ReasonCode::try_from(src[cursor])?;
-        cursor += reason_code.encoded_len();
-        
+        let (reason_code, properties) = match remain_len.value {
+            2 => (ReasonCode::Success, None),
+            _=> {
+                let reason_code = ReasonCode::try_from(src[cursor])?;
+                cursor += reason_code.encoded_len();
+
+                (reason_code, PubrelProperties::decode(&src[cursor..])?.value())
+            }
+        };
+
         let mut result = Self::new(packet_identifier, reason_code)?;
-        result.properties = PubrelProperties::decode(&src[cursor..])?.value();
+        result.properties = properties;
         
         Ok(result)
     }

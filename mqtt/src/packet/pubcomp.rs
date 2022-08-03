@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use mqtt_derive::MqttProperties;
 
-use crate::{types::{ReasonCode, MqttDataType}, error::MqttError, packet::Decodeable};
+use crate::{types::{ReasonCode, MqttDataType}, error::MqttError};
 
-use super::MqttControlPacket;
+use super::{MqttControlPacket, Decodeable};
 
 /// `PUBCOMP` is the final message in the flow initiated with `PUBLISH` sent with [crate::types::QoS::ExactlyOnce].
 /// 
@@ -57,11 +57,14 @@ impl From<Pubcomp> for Vec<u8> {
 
         result.push(FIRST_BYTE);
         super::push_be_u16(pubcomp.packet_identifier, &mut result);
-        result.push(pubcomp.reason_code.into());
+        
+        if pubcomp.reason_code != ReasonCode::Success || pubcomp.properties.is_some() {
+            result.push(pubcomp.reason_code.into());
 
-        match pubcomp.properties {
-            Some(props) => result.append(&mut props.into()),
-            None => result.push(0),
+            match pubcomp.properties {
+                Some(props) => result.append(&mut props.into()),
+                None => result.push(0),
+            }
         }
 
         super::calculate_and_insert_length(&mut result);
@@ -87,11 +90,18 @@ impl TryFrom<&[u8]> for Pubcomp {
         let packet_identifier = super::u16_from_be_bytes(&src[cursor..])?;
         cursor += packet_identifier.encoded_len();
 
-        let reason_code = ReasonCode::try_from(src[cursor])?;
-        cursor += reason_code.encoded_len();
+        let (reason_code, properties) = match remain_len.value {
+            2 => (ReasonCode::Success, None),
+            _=> {
+                let reason_code = ReasonCode::try_from(src[cursor])?;
+                cursor += reason_code.encoded_len();
+
+                (reason_code, PubcompProperties::decode(&src[cursor..])?.value())
+            }
+        };
         
         let mut result = Self::new(packet_identifier, reason_code)?;
-        result.properties = PubcompProperties::decode(&src[cursor..])?.value();
+        result.properties = properties;
         
         Ok(result)
     }
