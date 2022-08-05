@@ -1,0 +1,8 @@
+[package]
+name = "mqtt-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mqtt = { path = "../mqtt"}
+clap = { version = "3", features = ["derive"]}

@@ -6,7 +6,7 @@ use crate::{types::{ReasonCode, MqttDataType}, error::MqttError};
 use super::{MqttControlPacket, PacketType, Decodeable, DecodingResult, remaining_length};
 
 /// The first byte with packet identifier and flags is static for DISCONNECT packets
-const FIRST_BYTE: u8 = 0b011100000;
+const FIRST_BYTE: u8 = 0b11100000;
 
 /// A `DISCONNECT` message cleanly severs the connection between client and server.
 /// 
@@ -155,6 +155,13 @@ mod tests {
         let binary: Vec<u8> = vec![FIRST_BYTE, 0];
         let decoded = Disconnect::try_from(binary.as_slice()).unwrap();
         assert_eq!(ReasonCode::Success, decoded.reason_code);
+    }
+
+    #[test]
+    fn decode_reason_code() {
+        let binary: Vec<u8> = vec![224, 1, 130];
+        let disconnect = Disconnect::try_from(&binary[..]).unwrap();
+        assert_eq!(ReasonCode::ProtocolError, disconnect.reason_code);        
     }
 
     #[test]

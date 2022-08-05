@@ -86,6 +86,10 @@ pub fn parse_properties<F>(src: &[u8], mut f: F) -> Result<usize, MqttError>
 where
     F: FnMut(MqttProperty) -> Result<(), MqttError>
 {
+    if src.len() == 0 {
+        return Ok(0)
+    }
+    
     let properties_length = VariableByteInteger::try_from(src)?;
     let length: usize = properties_length.value.try_into().unwrap();
 

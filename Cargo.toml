@@ -3,4 +3,5 @@
 members = [
     "mqtt-derive",
     "mqtt",
+    "mqtt-cli"
 ]

@@ -249,7 +249,7 @@ impl Default for Connect {
             keep_alive: 0,
             properties: None,
             will: None,
-            clean_start: false,
+            clean_start: true,
             username: None,
             password: None,
         }

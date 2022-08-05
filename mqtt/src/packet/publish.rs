@@ -64,14 +64,14 @@ pub struct Publish {
 /// See [the MQTT spec](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html) about properties.
 #[derive(Debug, MqttProperties)]
 pub struct PublishProperties {
-    payload_format_indicator: Option<bool>,
-    message_expiry_interval: Option<u32>,
-    topic_alias: Option<u16>,
-    response_topic: Option<String>,
-    correlation_data: Option<Vec<u8>>,
-    user_property: HashMap<String, String>,
-    subscription_identifier: Option<VariableByteInteger>,
-    content_type: Option<String>,
+    pub payload_format_indicator: Option<bool>,
+    pub message_expiry_interval: Option<u32>,
+    pub topic_alias: Option<u16>,
+    pub response_topic: Option<String>,
+    pub correlation_data: Option<Vec<u8>>,
+    pub user_property: HashMap<String, String>,
+    pub subscription_identifier: Option<VariableByteInteger>,
+    pub content_type: Option<String>,
 }
 
 impl MqttControlPacket<'_> for Publish {

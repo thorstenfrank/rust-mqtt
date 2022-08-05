@@ -3,13 +3,5 @@ name = "mqtt"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "client"
-test = false
-
-[[bin]]
-name = "server"
-test = false
-
 [dependencies]
 mqtt-derive = { path = "../mqtt-derive"}

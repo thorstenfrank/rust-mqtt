@@ -28,6 +28,7 @@ pub fn generate_decode(
     quote! {
         impl crate::packet::Decodeable for #name {
             fn decode(src: &[u8]) -> std::result::Result<super::DecodingResult<Self>, crate::error::MqttError> {
+                
                 let mut result = Self::default();
                 let bytes_read = super::properties::parse_properties(src, |prop| {
                     match prop.identifier {
