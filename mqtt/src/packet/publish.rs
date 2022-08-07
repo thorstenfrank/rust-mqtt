@@ -4,7 +4,7 @@ use mqtt_derive::MqttProperties;
 
 use crate::{types::{QoS, VariableByteInteger, UTF8String, MqttDataType}, error::MqttError};
 
-use super::{remaining_length, Decodeable, DecodingResult, MqttControlPacket};
+use super::{remaining_length, Decodeable, DecodingResult, MqttControlPacket, properties};
 
 /// An MQTT `PUBLISH` packet is used to send a specific message to a topic.
 /// 
@@ -165,6 +165,7 @@ impl TryFrom<&[u8]> for Publish {
 
         let remain_len = remaining_length(&src[cursor..])?;
         cursor += remain_len.encoded_len();
+        let mut payload_len = remain_len.value as usize;
 
         // topic name
         /* TODO!
@@ -181,6 +182,8 @@ The Topic Name in the PUBLISH packet MUST NOT contain wildcard characters [MQTT-
         */
         let topic_name_res = UTF8String::try_from(&src[cursor..])?;
         cursor += topic_name_res.encoded_len();
+        payload_len -= topic_name_res.encoded_len();
+
         let topic_name = match topic_name_res.value {
             Some(v) => v,
             None => String::new(),
@@ -190,21 +193,21 @@ The Topic Name in the PUBLISH packet MUST NOT contain wildcard characters [MQTT-
         // only present in case QoS is > 0
         let packet_identifier = match qos_level {
             QoS::AtMostOnce => None,
-            _=> Some(super::u16_from_be_bytes(&src[cursor..cursor + 2])?),
+            _=> {
+                let pid = super::u16_from_be_bytes(&src[cursor..cursor + 2])?;
+                cursor += pid.encoded_len();
+                payload_len -= pid.encoded_len();
+                Some(pid)
+            },
         };
 
         // properties
         let prop_res: DecodingResult<PublishProperties> = PublishProperties::decode(&src[cursor..])?;
         cursor += prop_res.bytes_read();
-
-
-        // src.len = 40
-        // cursor = 30
-        // stop = 39
+        payload_len -= prop_res.bytes_read();
 
         // payload
-        let cursor_stop = remain_len.value as usize - cursor;
-        let payload: Vec<u8> = src[cursor..cursor_stop].to_vec();
+        let payload: Vec<u8> = src[cursor..cursor + payload_len].to_vec();
 
         Ok(Self {
             dup,
@@ -274,6 +277,18 @@ mod tests {
         
         assert_eq!(expect, packet);
     }
+
+    #[test]
+    fn decode() {
+        let msg: Vec<u8> = vec![48, 20, 0, 11, 47, 115, 111, 109, 101, 47, 116, 111, 112, 105, 99, 0, 115, 101, 114, 118, 117, 115];
+        let publ = Publish::try_from(&msg[..]).unwrap();
+        assert_eq!(false, publ.dup);
+        assert!(publ.packet_identifier.is_none());
+        assert!(publ.properties.is_none());
+        assert_eq!(String::from("/some/topic"), publ.topic_name);
+        assert_eq!(String::from("servus"), String::from_utf8(publ.payload).unwrap());
+    }
+
     #[test]
     fn decode_wrong_packet_type() {
         let vec: Vec<u8> = vec![0b01010101];
@@ -301,9 +316,17 @@ mod tests {
         props.user_property.insert("debug".to_string(), "true".to_string());
         props.topic_alias = Some(334);
 
-        let expect: Vec<u8> = vec![19, 1, 1, 35, 1, 78, 38, 0, 5, 100, 101, 98, 117, 103, 0, 4, 116, 114, 117, 101];
+        let expect: Vec<u8> = vec![19,1,1,35,1,78,38,0,5,100,101,98,117,103,0,4,116,114,117,101];
         let actual: Vec<u8> = props.into();
         assert_eq!(expect, actual);
+    }
+
+    /// another example from a 'real' mqtt broker
+    #[test]
+    fn decode_qos_1() {
+        let msg: Vec<u8> = vec![48,43,0,11,47,115,111,109,101,47,116,111,112,105,99,0,123,34,104,101,112,112,34,58,34,115,99,104,105,110,103,34,44,34,99,105,97,111,34,58,116,114,117,101,125];
+        let publ = Publish::try_from(&msg[..]);
+        println!("{:?}", publ);
     }
 
     fn test_packet() -> Publish {
