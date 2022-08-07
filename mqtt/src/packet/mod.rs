@@ -60,7 +60,7 @@ pub use self::publish::{Publish, PublishProperties};
 pub use self::pubrec::{Pubrec, PubrecProperties};
 pub use self::pubrel::{Pubrel, PubrelProperties};
 pub use self::suback::{Suback, SubackProperties};
-pub use self::subscribe::{Subscribe, SubscribeProperties};
+pub use self::subscribe::{Subscribe, SubscribeProperties, TopicFilter};
 pub use self::unsub::{Unsubscribe, UnsubscribeProperties};
 pub use self::unsuback::{Unsuback, UnsubackProperties};
 
