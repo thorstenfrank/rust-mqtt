@@ -25,7 +25,7 @@ impl Publish {
         if let Some(qos) = self.qos {
             publish.qos_level = QoS::try_from(qos).unwrap();
             if qos == 1 || qos == 2 {
-                publish.packet_identifier = Some(89)
+                publish.packet_identifier = Some(session.packet_identifier())
             }
         }
         

@@ -1,6 +1,6 @@
 use std::{net::TcpStream, io::{Write, Read}};
 
-use mqtt::{error::MqttError, packet::{Connect, Connack, Publish, Disconnect, Puback, PacketType, Pubrec, Pubrel, Pubcomp, ConnackProperties}, types::{QoS, ReasonCode}};
+use mqtt::{error::MqttError, packet::{Connect, Connack, Publish, Disconnect, Puback, PacketType, Pubrec, Pubrel, Pubcomp, ConnackProperties, Subscribe}, types::{QoS, ReasonCode}};
 
 use crate::Session;
 
@@ -62,6 +62,61 @@ impl Client {
         }
     }
 
+    pub fn subscribe(&mut self, packet: Subscribe) -> Result<(), MqttError> {
+        println!("SUBSCRIBE: {:?}", packet);
+        self.send(packet)?;
+
+        let response = self.receive()?;
+        match PacketType::try_from(response[0])? {
+            PacketType::SUBACK => {
+                let suback = mqtt::packet::Suback::try_from(&response[..])?;
+                println!("SUBACK: {:?}", suback);
+                self.listen();
+                Ok(())
+            },
+            PacketType::DISCONNECT => {
+                let disconnect = Disconnect::try_from(&response[..])?;
+                println!("DISCONNECT: {:?}", disconnect);
+                self.connected = false;
+                Err(MqttError::Message(format!("Server disconnected after SUBSCRIBE with reason code {:?}", disconnect.reason_code)))
+            },
+            _=> {
+                Err(MqttError::ProtocolError(format!("Unexpected response message: {:?}", response)))
+            },
+        }
+    }
+
+    fn listen(&mut self) {
+        loop {
+            if let Ok(rec) = self.receive() {
+                if rec.len() > 0 {
+                    match PacketType::try_from(rec[0]).unwrap() {
+                        PacketType::PUBLISH => {
+                            let publ = Publish::try_from(&rec[..]).unwrap();
+                            println!("Received PUBLISH: {:?}", publ)
+                        },
+                        els => println!("Received unexepcted packet {:?}: {:?}", els, rec),
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn disconnect(&mut self) -> Result<(), MqttError> {
+        if !self.connected {
+            return Ok(())
+        }
+
+        let disconnect = Disconnect::default();
+        println!("DISCONNECT: {:?}", disconnect);
+        self.send(disconnect)?;
+        match self.stream.shutdown(std::net::Shutdown::Both) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MqttError::Message(format!("Error closing stream: {:?}", e))),
+        }
+        
+    }
+
     fn handle_pub_qos(&mut self, qos: QoS) -> Result<(), MqttError> {
         let response = self.receive()?;
         match PacketType::try_from(response[0])? {
@@ -106,21 +161,6 @@ impl Client {
                 Err(MqttError::ProtocolError(format!("Unexpected response message: {:?}", response)))
             },
         }
-    }
-
-    pub fn disconnect(&mut self) -> Result<(), MqttError> {
-        if !self.connected {
-            return Ok(())
-        }
-
-        let disconnect = Disconnect::default();
-        println!("DISCONNECT: {:?}", disconnect);
-        self.send(disconnect)?;
-        match self.stream.shutdown(std::net::Shutdown::Both) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MqttError::Message(format!("Error closing stream: {:?}", e))),
-        }
-        
     }
 
     fn send<P: Into<Vec<u8>>>(&mut self, packet: P) -> Result<(), MqttError> {

@@ -40,6 +40,13 @@ pub struct Session {
     addr: (String, u16),
 }
 
+impl Session {
+    /// just a mock for now
+    pub fn packet_identifier(&self) -> u16 {
+        21
+    } 
+}
+
 fn main() {
     let args = Args::parse();
 

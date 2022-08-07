@@ -1,6 +1,5 @@
 use clap::Parser;
-
-use crate::Session;
+use crate::{Session, client::Client};
 
 #[derive(Debug, Parser)]
 pub struct Subscribe {
@@ -11,8 +10,21 @@ pub struct Subscribe {
 
 impl Subscribe {
 
-    pub fn execute(&self, _session: Session) {
-        println!("Subscribing to topic [{}]", self.topic);
-        println!("!!! TO BE IMPLEMENTED !!!");
+    pub fn execute(&self, session: Session) {
+        let topic = mqtt::packet::TopicFilter::new(self.topic.clone());
+
+        let subscribe = mqtt::packet::Subscribe{
+            packet_identifier: session.packet_identifier(),
+            properties: None,
+            topic_filter: vec![topic],
+        };
+
+        let mut client = Client::connect(session).unwrap_or_else(|err| {
+            panic!("{:?}", err)
+        });
+
+        client.subscribe(subscribe).unwrap_or_else(|err| {
+            panic!("{:?}", err)
+        });
     }
 }

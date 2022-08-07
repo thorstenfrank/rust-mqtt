@@ -4,7 +4,7 @@ use mqtt_derive::MqttProperties;
 
 use crate::{types::{QoS, VariableByteInteger, UTF8String, MqttDataType}, error::MqttError};
 
-use super::{remaining_length, Decodeable, DecodingResult, MqttControlPacket, properties};
+use super::{remaining_length, Decodeable, DecodingResult, MqttControlPacket};
 
 /// An MQTT `PUBLISH` packet is used to send a specific message to a topic.
 /// 
