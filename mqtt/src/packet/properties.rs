@@ -236,11 +236,11 @@ impl MqttDataType for DataRepresentation {
     }
 }
 
-impl TryInto<bool> for DataRepresentation {
+impl TryFrom<DataRepresentation> for bool {
     type Error = MqttError;
 
-    fn try_into(self) -> Result<bool, Self::Error> {
-        if let DataRepresentation::Byte(v) = self {
+    fn try_from(src: DataRepresentation) -> Result<Self, Self::Error> {
+        if let DataRepresentation::Byte(v) = src {
             match v {
                 0 => return Ok(false),
                 1 => return Ok(true),
@@ -248,7 +248,7 @@ impl TryInto<bool> for DataRepresentation {
             }
         }
 
-        Err(MqttError::ProtocolError(format!("only DataRepresentation::Byte can be converted to bool. Is: {:?}", self)))
+        Err(MqttError::ProtocolError(format!("only DataRepresentation::Byte can be converted to bool. Is: {:?}", src)))
 
     }
 }
@@ -259,15 +259,15 @@ impl MqttDataType for MqttProperty {
     }
 }
 
-impl Into<Vec<u8>> for MqttProperty {
-    fn into(self) -> Vec<u8> {
+impl From<MqttProperty> for Vec<u8> {
+    fn from(src: MqttProperty) -> Self {
         let mut result = Vec::new();
 
         // this works for now, because all IDs have a numeric value < 127
         // technically, this should be a Variable Byte Integer, though
-        result.push(self.identifier as u8);
+        result.push(src.identifier as u8);
 
-        match self.value {
+        match src.value {
             DataRepresentation::Byte(b) => result.push(b),
             DataRepresentation::TwoByteInt(i) => super::push_be_u16(i, &mut result),
             DataRepresentation::FourByteInt(i) => super::push_be_u32(i, &mut result),

@@ -54,9 +54,9 @@ impl From<&str> for UTF8String {
     }
 }
 
-impl Into<Vec<u8>> for UTF8String {
-    fn into(self) -> Vec<u8> {
-        match self.value {
+impl From<UTF8String> for Vec<u8> {
+    fn from(src: UTF8String) -> Self {
+        match src.value {
             Some(utf8) => {
                 let bytes = utf8.as_bytes();
                 let mut result = Vec::new();
@@ -76,9 +76,10 @@ impl Into<Vec<u8>> for UTF8String {
     }
 }
 
-impl Into<String> for UTF8String {
-    fn into(self) -> String {
-        match self.value {
+impl From<UTF8String> for String {
+    /// Returns an empty `String` if [UTF8String.value] is `None`.
+    fn from(src: UTF8String) -> Self {
+        match src.value {
             Some(s) => s,
             None => String::new(),
         }
@@ -132,10 +133,10 @@ impl MqttDataType for UTF8StringPair {
 
 }
 
-impl Into<Vec<u8>> for UTF8StringPair {
-    fn into(self) -> Vec<u8> {
-        let mut result: Vec<u8> = self.key.into();
-        let mut val: Vec<u8> = self.value.into();
+impl From<UTF8StringPair> for Vec<u8> {
+    fn from(src: UTF8StringPair) -> Self {
+        let mut result: Vec<u8> = src.key.into();
+        let mut val: Vec<u8> = src.value.into();
         result.append(&mut val);
         result
     }

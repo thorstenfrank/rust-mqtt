@@ -80,15 +80,15 @@ impl TryFrom<&[u8]> for Disconnect {
     }
 }
 
-impl Into<Vec<u8>> for Disconnect {
-    fn into(self) -> Vec<u8> {
+impl From<Disconnect> for Vec<u8> {
+    fn from(src: Disconnect) -> Self {
         let mut packet: Vec<u8> = Vec::new();
 
         packet.push(FIRST_BYTE);
         
-        packet.push(self.reason_code.into());
+        packet.push(src.reason_code.into());
 
-        if let Some(props) = self.properties {
+        if let Some(props) = src.properties {
             packet.append(&mut props.into());
         } else {
             packet.push(0); // no properties => just add a zero

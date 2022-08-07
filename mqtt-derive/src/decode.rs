@@ -1,9 +1,8 @@
 use quote::quote;
 
-use crate::utils::{PropertyFieldMeta};
+use crate::utils::PropertyFieldMeta;
 
-/// Generates an `impl Into<std::vec::Vec<u8>> for #ype_name` where `#struct_name` is the name of the struct with the
-/// derive annotation.
+/// Generates an `impl crate::packet::Decodeable for` the annotated struct.
 pub fn generate_decode(
     name: &syn::Ident,
     fields: &Vec<PropertyFieldMeta>,

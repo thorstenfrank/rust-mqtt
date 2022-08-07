@@ -1,4 +1,4 @@
-//! Primarily implement the Variable Byte Integer type, but also adds trait impls for basic rust types.
+//! Primarily implements the `Variable Byte Integer` type, but also adds trait impls for basic rust types.
 
 use crate::error::MqttError;
 
@@ -57,13 +57,13 @@ impl From<u32> for VariableByteInteger {
     }
 }
 
-impl Into<Vec<u8>> for VariableByteInteger {
+impl From<VariableByteInteger> for Vec<u8> {
 
     /// Converts an unsigned integer (max 28 bits) into the binary representation according to MQTT Spec 1.5.5.
-    fn into(self) -> Vec<u8> {
+    fn from(src: VariableByteInteger) -> Self {
         // FIXME add validation to make sure the value does not exceed the max (268,435,455)
         let mut res: Vec<u8> = Vec::new();
-        let mut val = self.value;
+        let mut val = src.value;
 
         if val == 0 {
             return vec![0]

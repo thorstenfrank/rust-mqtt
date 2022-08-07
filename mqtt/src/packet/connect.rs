@@ -256,9 +256,9 @@ impl Default for Connect {
     }
 }
 
-impl Into<Vec<u8>> for Connect {
+impl From<Connect> for Vec<u8> {
 
-    fn into(self) -> Vec<u8> {
+    fn from(src: Connect) -> Self {
         let mut packet: Vec<u8> = Vec::new();
 
         // fixed header
@@ -271,31 +271,31 @@ impl Into<Vec<u8>> for Connect {
         //packet.append(&mut UTF8String::from_str("MQTT").into());
         
         //   - protocol version
-        packet.push(self.protocol_level);
+        packet.push(src.protocol_level);
 
         // connect flags
-        packet.push(ConnectFlags::build(&self).into());
+        packet.push(ConnectFlags::build(&src).into());
 
         // keep alive
-        for b in self.keep_alive.to_be_bytes() {
+        for b in src.keep_alive.to_be_bytes() {
             packet.push(b);
         }
         
         // properties
-        if let Some(p) = self.properties {
+        if let Some(p) = src.properties {
             packet.append(&mut p.into())
         } else {
             packet.push(0)
         }
 
         // client id
-        let client_id = match self.client_id {
+        let client_id = match src.client_id {
             Some(s) => UTF8String::from(s),
             None => UTF8String::new(),
         };
         packet.append(&mut client_id.into());
 
-        if let Some(will) = self.will {
+        if let Some(will) = src.will {
             // FIXME include will properties, for now we're just setting them to '0' length
             match will.properties {
                 Some(props) => packet.append(&mut props.into()),
@@ -308,11 +308,11 @@ impl Into<Vec<u8>> for Connect {
             packet.append(&mut payload.into());
         }
 
-        if let Some(uname) = self.username {
+        if let Some(uname) = src.username {
             packet.append(&mut UTF8String::from(uname).into());
         }
 
-        if let Some(pwd) = self.password {
+        if let Some(pwd) = src.password {
             let password = BinaryData::new(pwd).unwrap();
             packet.append(&mut password.into());
         }

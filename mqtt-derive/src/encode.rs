@@ -2,8 +2,7 @@ use quote::{format_ident, quote};
 
 use crate::utils::PropertyFieldMeta;
 
-/// Generates an `impl Into<std::vec::Vec<u8>> for #ype_name` where `#struct_name` is the name of the struct with the
-/// derive annotation.
+/// Generates an `impl From<SRC_TYPE> for std::vec::Vec<u8> where `SRC_TYPE` is the annotated type.
 pub fn generate_encode(
     name: &syn::Ident,
     fields: &Vec<PropertyFieldMeta>,
@@ -11,8 +10,8 @@ pub fn generate_encode(
     let into_fields = fields.iter().map(|f| quote_field(f));
 
     quote! {
-        impl Into<std::vec::Vec<u8>> for #name {
-            fn into(self) -> std::vec::Vec<u8> {
+        impl From<#name> for std::vec::Vec<u8> {
+            fn from(src: #name) -> Self {
                 let mut result: std::vec::Vec<u8> = Vec::new();
 
                 #(#into_fields;)*
@@ -42,7 +41,7 @@ fn quote_field(field: &PropertyFieldMeta) -> quote::__private::TokenStream {
     if field.map {
         // we only support HashMap<String, String> at the moment
         return quote! {
-            for (k, v) in self.#name {
+            for (k, v) in src.#name {
                 #assign_and_encode
             }
         };
@@ -50,12 +49,12 @@ fn quote_field(field: &PropertyFieldMeta) -> quote::__private::TokenStream {
 
     match field.optional {
         true => quote!{
-            if let Some(v) = self.#name {
+            if let Some(v) = src.#name {
                 #assign_and_encode
             }
         },
         false => quote!{
-            let v = self.#name;
+            let v = drc.#name;
             #assign_and_encode
         },
     }

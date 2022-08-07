@@ -34,10 +34,9 @@ impl MqttDataType for BinaryData {
     }
 }
 
-impl Into<Vec<u8>> for BinaryData {
-    
-    fn into(self) -> Vec<u8> {
-        let len = self.inner.len();
+impl From<BinaryData> for Vec<u8> {
+    fn from(src: BinaryData) -> Self {
+        let len = src.inner.len();
         let mut result = Vec::with_capacity(len + 2);
         
         let length = len as u16;
@@ -45,7 +44,7 @@ impl Into<Vec<u8>> for BinaryData {
             result.push(b)
         }
 
-        for b in self.inner {
+        for b in src.inner {
             result.push(b);
         }
 
