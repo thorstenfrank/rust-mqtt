@@ -1,10 +1,10 @@
 use clap::Parser;
 use mqtt::types::QoS;
 
-use crate::{client::Client, Session};
+use crate::{client::Client, Session, CmdResult};
 
 #[derive(Debug, Parser)]
-pub struct Publish {
+pub struct PublishCmd {
     /// Topic to publish to
     #[clap(short, long)]
     topic: String,
@@ -18,25 +18,26 @@ pub struct Publish {
     qos: Option<u8>,
 }
 
-impl Publish {
+impl PublishCmd {
 
-    pub fn execute(&self, session: Session) {
-        let mut publish = mqtt::packet::Publish::new(self.topic.clone(), self.message.clone().into_bytes());
+    pub fn execute(&self, session: Session) -> CmdResult {
+        let mut publish = mqtt::packet::Publish::new(
+            self.topic.clone(), 
+            self.message.clone().into_bytes());
+
         if let Some(qos) = self.qos {
-            publish.qos_level = QoS::try_from(qos).unwrap();
+            publish.qos_level = QoS::try_from(qos)?;
             if qos == 1 || qos == 2 {
                 publish.packet_identifier = Some(session.packet_identifier())
             }
         }
         
-        let mut client = Client::connect(session).unwrap_or_else(|err| {
-            panic!("{:?}", err)
-        });
+        let mut client = Client::connect(session)?;
         
-        client.publish( publish).unwrap_or_else(|err| {
-            panic!("{:?}", err)
-        });
+        client.publish( publish)?;
 
-        client.disconnect().unwrap();
+        client.disconnect()?;
+
+        Ok(())
     }
 }

@@ -21,8 +21,9 @@ pub struct SubscribeProperties {
 
 #[derive(Debug)]
 pub struct TopicFilter {
+    /// Topic name pattern, may onclude wildcards
     pub filter: String,
-    /// Defaults to [crate::types::QoS::AtLeastOnce]
+    /// Defaults to [0](crate::types::QoS::AtMostOnce)
     pub maximum_qos: QoS,
     /// Default: `false`
     pub no_local: bool,

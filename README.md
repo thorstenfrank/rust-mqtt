@@ -12,8 +12,8 @@ not to ([CLI](#Running).
 
 Especially the lib part purposefully ignores the usual set of obvious helpers like `thiserror`, maybe `nom` or `serde`.
 
-There are also obviously no efforts to go `no_std` or take embedded requirements into consideration. If you find
-yourself in need of an MQTT implementation for embedded scenarios, there's way better options out there.
+There are also obviously no efforts to go `no_std` or take embedded requirements into consideration. For that, there's 
+way better options out there.
 
 ## Contents
 - `mqtt`: the basic protocol implementation, data types, packets, encoding and decoding

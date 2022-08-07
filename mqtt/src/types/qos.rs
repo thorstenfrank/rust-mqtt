@@ -20,7 +20,7 @@ impl TryFrom<u8> for QoS {
             0 => Ok(QoS::AtMostOnce),
             1 => Ok(QoS::AtLeastOnce),
             2 => Ok(QoS::ExactlyOnce),
-            _=> Err(MqttError::MalformedPacket(format!("Illegal value for QoS: {}", value))),
+            _=> Err(MqttError::MalformedPacket(format!("illegal value for QoS: {}", value))),
         }
     }
 }

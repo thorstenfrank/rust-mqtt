@@ -4,7 +4,8 @@ mod subscribe;
 
 //const DEFAULT_PORT: u16 = 1883;
 use clap::{Subcommand, Parser};
-use crate::{publish::Publish, subscribe::Subscribe};
+use mqtt::error::MqttError;
+use crate::{publish::PublishCmd, subscribe::SubscribeCmd};
 
 #[derive(Debug, Parser)]
 struct Args {
@@ -29,10 +30,10 @@ struct Args {
 #[derive(Debug, Subcommand)]
 enum Command {
     /// publishes to a broker
-    Pub(Publish),
+    Pub(PublishCmd),
 
     /// subscribes to a topic
-    Sub(Subscribe),
+    Sub(SubscribeCmd),
 }
 
 pub struct Session {
@@ -47,7 +48,9 @@ impl Session {
     } 
 }
 
-fn main() {
+type CmdResult = Result<(), MqttError>;
+
+fn main() -> CmdResult {
     let args = Args::parse();
 
     let host = args.host.unwrap_or(String::from("localhost"));
