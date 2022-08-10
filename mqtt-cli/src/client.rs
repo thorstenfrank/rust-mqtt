@@ -14,13 +14,11 @@ pub struct Client {
 
 impl Client {
 
-    //const DEFAULT_PORT: u16 = 1883;
-    //const DEFAULT_PORT_SECURE: u16 = 8883;
-
     pub fn connect(session: Session) -> Result<Self, MqttError> {
-        println!("Connecting to {:?}", session.addr);
+        let addr = session.addr();
+        println!("Connecting to {:?}", addr);
 
-        let stream = TcpStream::connect(&session.addr).unwrap_or_else(|e| {
+        let stream = TcpStream::connect(&addr).unwrap_or_else(|e| {
             panic!("Error establishing connection to server: {:?}", e)
         });
 
@@ -166,10 +164,8 @@ impl Client {
     fn send<P: Into<Vec<u8>>>(&mut self, packet: P) -> Result<(), MqttError> {
         let binary = packet.into();
     
-        if self.session.debug {
-            println!("Sending {} bytes to server", binary.len());
-            println!("{:?}", binary);
-        }
+        self.session.debug(format!("Sending {} bytes to server", binary.len()));
+        self.session.debug(format!("{:?}", binary));
     
         if let Err(e) = self.stream.write_all(&binary[..]) {
             return Err(MqttError::Message(format!("Error sending CONNECT: {:?}", e)))
@@ -182,15 +178,10 @@ impl Client {
         let mut buff: [u8; 4048] = [0; 4048];
         match self.stream.read(&mut buff) {
             Ok(num_bytes) => {
-                if self.session.debug {
-                    println!("Read {} bytes from server", num_bytes);
-                }
+                self.session.debug(format!("Read {} bytes from server", num_bytes));
                 let mut result: Vec<u8> = Vec::with_capacity(num_bytes);
                 result.extend_from_slice(&buff[..num_bytes]);
-                if self.session.debug {
-                    println!("{:?}", result);
-                }
-                
+                self.session.debug(format!("{:?}", result));
                 return Ok(result)
             },
             Err(e) => return Err(MqttError::Message(format!("Error reading from stream: {:?}", e))),
