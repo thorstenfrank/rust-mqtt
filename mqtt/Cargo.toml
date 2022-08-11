@@ -1,6 +1,13 @@
 [package]
 name = "mqtt"
 version = "0.1.0"
+authors = ["Thorsten Frank <github@tfsw.de>"]
+description = "MQTT v5 protocol implementation"
+readme = "../README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["mqtt", "messaging"]
+categories = ["network-programming"]
+repository = "https://github.com/thorstenfrank/rust-mqtt"
 edition = "2021"
 
 [dependencies]

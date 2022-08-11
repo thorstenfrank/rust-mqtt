@@ -1,4 +1,6 @@
 //! A simple MQTT command-line client.
+//! 
+//! `cargo run help` will show the app's documentation
 
 mod client;
 mod cmd;

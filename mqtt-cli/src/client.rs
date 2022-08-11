@@ -195,9 +195,7 @@ impl Client {
 }
 
 /// need this function so there's no pointers to or ownership issues with the `Client` itself.
-fn receive_raw<R>(stream: &mut R) -> Result<Vec<u8>, MqttError> 
-where
-    R: Read
+fn receive_raw<R: Read>(stream: &mut R) -> Result<Vec<u8>, MqttError> 
 {
     const BUFFER_SIZE: usize = 4096;
     let mut buff: [u8; BUFFER_SIZE] = [0; BUFFER_SIZE];
