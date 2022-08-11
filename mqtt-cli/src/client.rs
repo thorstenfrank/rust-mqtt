@@ -88,7 +88,6 @@ impl Client {
     pub fn listen(&mut self) {
         // FIXME don't just unwrap!
         let mut stream = self.stream.try_clone().unwrap();
-
         std::thread::spawn(move || {
             loop {
                 if let Ok(rec) = receive_raw(&mut stream) {
@@ -196,12 +195,21 @@ impl Client {
 }
 
 /// need this function so there's no pointers to or ownership issues with the `Client` itself.
-fn receive_raw(stream: &mut TcpStream) -> Result<Vec<u8>, MqttError> {
-    let mut buff: [u8; 4048] = [0; 4048];
+fn receive_raw<R>(stream: &mut R) -> Result<Vec<u8>, MqttError> 
+where
+    R: Read
+{
+    const BUFFER_SIZE: usize = 4096;
+    let mut buff: [u8; BUFFER_SIZE] = [0; BUFFER_SIZE];
     match stream.read(&mut buff) {
         Ok(num_bytes) => {
             let mut result: Vec<u8> = Vec::with_capacity(num_bytes);
             result.extend_from_slice(&buff[..num_bytes]);
+
+            if num_bytes == BUFFER_SIZE {
+                result.extend_from_slice(&receive_raw(stream)?);
+            }
+
             return Ok(result)
         },
         Err(e) => return Err(MqttError::Message(format!("Error reading from stream: {:?}", e))),
