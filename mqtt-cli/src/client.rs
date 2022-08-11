@@ -2,7 +2,7 @@ use std::{net::TcpStream, io::{Write, Read}};
 
 use mqtt::{error::MqttError, packet::{Connect, Connack, Publish, Disconnect, Puback, PacketType, Pubrec, Pubrel, Pubcomp, ConnackProperties, Subscribe}, types::{QoS, ReasonCode}};
 
-use crate::Session;
+use crate::{Session, CmdResult};
 
 pub struct Client {
     session: Session,
@@ -49,7 +49,7 @@ impl Client {
         Ok(client)
     }
 
-    pub fn publish(&mut self, packet: Publish) -> Result<(), MqttError> {
+    pub fn publish(&mut self, packet: Publish) -> CmdResult {
         let qos = packet.qos_level.clone();
         self.packet_id = packet.packet_identifier;
         println!("PUBLISH: {:?}", packet);
@@ -60,7 +60,7 @@ impl Client {
         }
     }
 
-    pub fn subscribe(&mut self, packet: Subscribe) -> Result<(), MqttError> {
+    pub fn subscribe(&mut self, packet: Subscribe) -> CmdResult {
         println!("SUBSCRIBE: {:?}", packet);
         self.send(packet)?;
 
@@ -69,7 +69,7 @@ impl Client {
             PacketType::SUBACK => {
                 let suback = mqtt::packet::Suback::try_from(&response[..])?;
                 println!("SUBACK: {:?}", suback);
-                self.listen();
+                //self.listen();
                 Ok(())
             },
             PacketType::DISCONNECT => {
@@ -84,23 +84,29 @@ impl Client {
         }
     }
 
-    fn listen(&mut self) {
-        loop {
-            if let Ok(rec) = self.receive() {
-                if rec.len() > 0 {
-                    match PacketType::try_from(rec[0]).unwrap() {
-                        PacketType::PUBLISH => {
-                            let publ = Publish::try_from(&rec[..]).unwrap();
-                            println!("Received PUBLISH: {:?}", publ)
-                        },
-                        els => println!("Received unexepcted packet {:?}: {:?}", els, rec),
+    /// clones the `TcpStream` of this client and spawns a new thread to listen to incoming messages.
+    pub fn listen(&mut self) {
+        // FIXME don't just unwrap!
+        let mut stream = self.stream.try_clone().unwrap();
+
+        std::thread::spawn(move || {
+            loop {
+                if let Ok(rec) = receive_raw(&mut stream) {
+                    if rec.len() > 0 {
+                        match PacketType::try_from(rec[0]).unwrap() {
+                            PacketType::PUBLISH => {
+                                let publ = Publish::try_from(&rec[..]).unwrap();
+                                println!("Received PUBLISH: {:?}", publ)
+                            },
+                            els => println!("Received unexepcted packet {:?}: {:?}", els, rec),
+                        }
                     }
                 }
             }
-        }
+        });
     }
 
-    pub fn disconnect(&mut self) -> Result<(), MqttError> {
+    pub fn disconnect(&mut self) -> CmdResult {
         if !self.connected {
             return Ok(())
         }
@@ -115,7 +121,7 @@ impl Client {
         
     }
 
-    fn handle_pub_qos(&mut self, qos: QoS) -> Result<(), MqttError> {
+    fn handle_pub_qos(&mut self, qos: QoS) -> CmdResult {
         let response = self.receive()?;
         match PacketType::try_from(response[0])? {
             PacketType::DISCONNECT => {
@@ -161,7 +167,7 @@ impl Client {
         }
     }
 
-    fn send<P: Into<Vec<u8>>>(&mut self, packet: P) -> Result<(), MqttError> {
+    fn send<P: Into<Vec<u8>>>(&mut self, packet: P) -> CmdResult {
         let binary = packet.into();
     
         self.session.debug(format!("Sending {} bytes to server", binary.len()));
@@ -189,4 +195,16 @@ impl Client {
     }
 }
 
+/// need this function so there's no pointers to or ownership issues with the `Client` itself.
+fn receive_raw(stream: &mut TcpStream) -> Result<Vec<u8>, MqttError> {
+    let mut buff: [u8; 4048] = [0; 4048];
+    match stream.read(&mut buff) {
+        Ok(num_bytes) => {
+            let mut result: Vec<u8> = Vec::with_capacity(num_bytes);
+            result.extend_from_slice(&buff[..num_bytes]);
+            return Ok(result)
+        },
+        Err(e) => return Err(MqttError::Message(format!("Error reading from stream: {:?}", e))),
+    }
+}
 

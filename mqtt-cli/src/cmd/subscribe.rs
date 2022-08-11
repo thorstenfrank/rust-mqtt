@@ -1,5 +1,5 @@
 use clap::Parser;
-use mqtt::types::QoS;
+use mqtt::{types::QoS, error::MqttError};
 use crate::{Session, client::Client, CmdResult};
 
 #[derive(Debug, Parser)]
@@ -30,7 +30,17 @@ impl SubscribeCmd {
         let mut client = Client::connect(session)?;
 
         client.subscribe(subscribe)?;
+        client.listen();
 
-        Ok(())
+        println!();
+        println!("##################################################");
+        println!("now listening for messages, press 'ENTER' to quit");
+        println!("##################################################");
+        println!();
+        
+        match std::io::stdin().read_line(&mut String::new()) {
+            Ok(_) => client.disconnect(),
+            Err(e) => Err(MqttError::Message(format!("error reading user input: {:?}", e))),
+        }
     }
 }
