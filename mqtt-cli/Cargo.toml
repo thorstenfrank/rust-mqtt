@@ -12,4 +12,4 @@ edition = "2021"
 
 [dependencies]
 mqtt = { path = "../mqtt"}
-clap = { version = "3", features = ["derive"]}
+clap = { version = "4", features = ["derive"]}

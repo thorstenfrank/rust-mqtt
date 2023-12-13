@@ -6,15 +6,15 @@ use crate::{client::Client, Session, CmdResult};
 #[derive(Debug, Parser)]
 pub struct PublishCmd {
     /// Topic to publish to
-    #[clap(short, long)]
+    #[arg(short, long)]
     topic: String,
 
     /// message payload
-    #[clap(short, long)]
+    #[arg(short, long)]
     message: String,
 
     /// Quality of Service level. 0 (at most once), 1 (at least once), 2 (exactly once)
-    #[clap(short, long)]
+    #[arg(short, long)]
     qos: Option<u8>,
 }
 

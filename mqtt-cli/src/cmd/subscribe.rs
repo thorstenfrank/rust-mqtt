@@ -5,11 +5,11 @@ use crate::{Session, client::Client, CmdResult};
 #[derive(Debug, Parser)]
 pub struct SubscribeCmd {
     /// Topic pattern to subscribe to, may include wildcards (`+` or `#`).
-    #[clap(short, long)]
+    #[arg(short, long)]
     topic: String,
 
     /// Quality of Service level. 1 or 2. 0 is the default, no need to expliclty specify in that case.
-    #[clap(short, long)]
+    #[arg(short, long)]
     qos: Option<u8>,
 }
 
